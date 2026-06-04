@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>外送平台派單模擬器 | Max-Heap 優先派單與騎手冷卻管理</title>
+    <style>
+        /* ===== 現代化變數：乾淨、柔和、醫療級配色延伸 ===== */
+        :root {
+            --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            --color-text-primary: #1e2e3e;
+            --color-text-secondary: #4a6a80;
+            --color-text-tertiary: #7a9bb8;
+            --color-background-primary: #ffffff;
+            --color-background-secondary: #f6faff;
+            --color-border-secondary: #e2edf5;
+            --color-border-tertiary: #d0e0ec;
+            --border-radius-md: 20px;
+            --border-radius-lg: 28px;
+            --shadow-sm: 0 8px 18px rgba(0, 0, 0, 0.02), 0 2px 4px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.06);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-text-primary: #edf2f9;
+                --color-text-secondary: #b5ceea;
+                --color-text-tertiary: #88accb;
+                --color-background-primary: #0f1824;
+                --color-background-secondary: #192b3c;
+                --color-border-secondary: #2a4054;
+                --color-border-tertiary: #2e4a66;
+                --shadow-sm: 0 8px 18px rgba(0, 0, 0, 0.4);
+                --shadow-md: 0 16px 28px rgba(0, 0, 0, 0.6);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: linear-gradient(145deg, #eff3f9 0%, #e6edf6 100%);
+            color: var(--color-text-primary);
+            padding: 1.5rem 1.2rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(145deg, #0e1723 0%, #0c1621 100%);
+            }
+        }
+
+        .w {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 0 0 1.5rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+        }
+
+        /* 控制列 膠囊風格 */
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 1.8rem;
+            background: var(--color-background-primary);
+            backdrop-filter: blur(8px);
+            padding: 10px 24px;
+            border-radius: 80px;
+            box-shadow: var(--shadow-sm);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        .row label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--color-background-secondary);
+            padding: 4px 16px 4px 20px;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+        }
+        .row input[type="number"] {
+            width: 64px;
+            padding: 6px 8px;
+            border: 1px solid var(--color-border-tertiary);
+            border-radius: 48px;
+            background: var(--color-background-primary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-align: center;
+            transition: 0.2s;
+        }
+        .row input:focus {
+            outline: none;
+            border-color: #378ADD;
+            box-shadow: 0 0 0 2px rgba(55,138,221,0.2);
+        }
+        .btn {
+            padding: 6px 18px;
+            border: none;
+            border-radius: 40px;
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+            border: 0.5px solid var(--color-border-tertiary);
+            font-family: inherit;
+        }
+        .btn:hover {
+            background: #e2eefc;
+            transform: translateY(-1px);
+        }
+        .btn.p {
+            background: #378ADD;
+            border: none;
+            color: white;
+            box-shadow: 0 4px 12px rgba(55,138,221,0.25);
+        }
+        .btn.p:hover {
+            background: #2c6db5;
+            transform: scale(0.98);
+        }
+        @media (prefers-color-scheme: dark) {
+            .btn:hover { background: #2c4b6e; }
+            .btn.p { background: #3b82f6; }
+            .btn.p:hover { background: #2563eb; }
+        }
+
+        /* 統計卡片 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 1.8rem;
+        }
+        .sc {
+            background: var(--color-background-primary);
+            backdrop-filter: blur(4px);
+            border-radius: 32px;
+            padding: 16px 16px;
+            box-shadow: var(--shadow-md);
+            border: 0.5px solid var(--color-border-tertiary);
+            transition: all 0.2s;
+        }
+        .sc:hover {
+            transform: translateY(-3px);
+        }
+        .sc .lb {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            color: var(--color-text-tertiary);
+            margin-bottom: 8px;
+        }
+        .sc .vl {
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .vg { color: #1D9E75; }
+        .vr { color: #e76f51; }
+        .vb { color: #378ADD; }
+        .vo { color: #e9a23b; }
+        @media (prefers-color-scheme: dark) {
+            .vg { color: #6bc2a5; }
+            .vr { color: #f4a261; }
+            .vb { color: #60a5fa; }
+            .vo { color: #f6b85d; }
+        }
+
+        /* 提示區域 */
+        .note {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+            padding: 12px 18px;
+            border-radius: 36px;
+            background: var(--color-background-primary);
+            border-left: 5px solid #378ADD;
+            margin-bottom: 1.2rem;
+            box-shadow: var(--shadow-sm);
+            font-weight: 500;
+        }
+
+        /* 雙欄結構 */
+        .two {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 1.5rem;
+        }
+        .pnl {
+            background: var(--color-background-primary);
+            border-radius: 32px;
+            box-shadow: var(--shadow-md);
+            border: 0.5px solid var(--color-border-tertiary);
+            overflow: hidden;
+        }
+        .ph {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            color: var(--color-text-secondary);
+            padding: 14px 20px;
+            background: rgba(0,0,0,0.02);
+            border-bottom: 1px solid var(--color-border-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #d-heap, #d-queue {
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        /* 自定義滾動條 */
+        #d-heap::-webkit-scrollbar, #d-queue::-webkit-scrollbar, .timeline::-webkit-scrollbar {
+            width: 5px;
+        }
+        #d-heap::-webkit-scrollbar-track, #d-queue::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #d-heap::-webkit-scrollbar-thumb {
+            background: var(--color-text-tertiary);
+            border-radius: 12px;
+        }
+
+        /* Heap 卡片 */
+        .o-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            border-radius: 28px;
+            border: 0.5px solid var(--color-border-tertiary);
+            background: var(--color-background-secondary);
+            font-size: 0.75rem;
+            transition: all 0.1s;
+        }
+        .o-item.top {
+            border-left: 4px solid #e76f51;
+            background: rgba(231,111,81,0.08);
+        }
+        .pri-badge {
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .pri1 { background: #fde8e8; color: #b91c1c; }
+        .pri2 { background: #feedd9; color: #b45309; }
+        .pri3 { background: #e2f7ef; color: #0f6e56; }
+        @media (prefers-color-scheme: dark) {
+            .pri1 { background: #631d1d; color: #f9acac; }
+            .pri2 { background: #774717; color: #ffcd94; }
+            .pri3 { background: #1b5443; color: #8fe5ca; }
+        }
+
+        /* Queue 項目 */
+        .r-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-radius: 32px;
+            border: 1px solid var(--color-border-tertiary);
+            background: var(--color-background-secondary);
+            font-size: 0.75rem;
+            transition: 0.1s;
+        }
+        .r-item.ready {
+            border-color: #1D9E75;
+            background: rgba(29,158,117,0.12);
+            box-shadow: 0 0 0 1px rgba(29,158,117,0.2);
+        }
+
+        /* 送達訂單標籤 */
+        .earnings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 0.5rem;
+            padding: 6px 0;
+        }
+        .earn-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 40px;
+            background: #E1F5EE;
+            color: #0F6E56;
+            border: 0.5px solid #9FE1CB;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        @media (prefers-color-scheme: dark) {
+            .earn-tag {
+                background: #16423a;
+                color: #8ee5cc;
+                border-color: #2d7964;
+            }
+        }
+
+        /* 時間軸序列 */
+        .timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 140px;
+            overflow-y: auto;
+            padding: 10px 12px;
+            background: var(--color-background-secondary);
+            border-radius: 28px;
+            margin-top: 6px;
+        }
+        .tsl {
+            width: 44px;
+            height: 44px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            transition: 0.1s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .tsl.work {
+            background: #DFEEFC;
+            color: #1a5c9e;
+            border: 0.5px solid #aac7f0;
+        }
+        .tsl.idle {
+            background: #FBEDD2;
+            color: #b45f1b;
+            border: 0.5px solid #f7cd94;
+        }
+        @media (prefers-color-scheme: dark) {
+            .tsl.work {
+                background: #1e405e;
+                color: #aad0ff;
+                border-color: #2e6a96;
+            }
+            .tsl.idle {
+                background: #543d18;
+                color: #f1bc7e;
+                border-color: #b67a2a;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="w">
+<h2 class="sr-only">外送平台派單模擬器：Max-Heap 按罰款優先級派單，騎手回程以 Queue 冷卻管理</h2>
+
+<div class="row">
+  <label>📦 訂單數 <input type="number" id="nOrd" min="5" max="60" value="15"></label>
+  <label>🛵 騎手數 <input type="number" id="nRider" min="1" max="6" value="2"></label>
+  <label>⏱️ 回程冷卻 <input type="number" id="cdRider" min="1" max="8" value="3"></label>
+  <button class="btn p" onclick="runDel()">✨ 新模擬</button>
+  <button class="btn" onclick="stepDel(-1)">◀ 上步</button>
+  <button class="btn" onclick="stepDel(1)">下步 ▶</button>
+  <button class="btn" onclick="stepDel(9999)">⏭ 完成</button>
+</div>
+
+<div class="stats">
+  <div class="sc"><div class="lb">📋 總訂單</div><div class="vl vb" id="d-total">-</div></div>
+  <div class="sc"><div class="lb">✅ 已送達</div><div class="vl vg" id="d-done">-</div></div>
+  <div class="sc"><div class="lb">⏳ 騎手閒置</div><div class="vl vr" id="d-idle">-</div></div>
+  <div class="sc"><div class="lb">💰 總營收（罰款省回）</div><div class="vl vo" id="d-earn">-</div></div>
+</div>
+
+<div class="note" id="d-note">🏍️ 按「新模擬」開始派單排程</div>
+
+<div class="two">
+  <div class="pnl">
+    <div class="ph">📌 Max-Heap 待派訂單（優先級 = 罰款↑ + 距離加權）</div>
+    <div id="d-heap"></div>
+  </div>
+  <div class="pnl">
+    <div class="ph">🔄 騎手回程冷卻 Queue (FIFO)</div>
+    <div id="d-queue"></div>
+  </div>
+</div>
+
+<div class="pnl" style="margin-bottom:1rem">
+  <div class="ph">🏆 已送達訂單 (累積營收)</div>
+  <div class="earnings" id="d-earnings"></div>
+</div>
+
+<div style="font-size:0.7rem; font-weight:600; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">⏲️ Time Slot 執行序列</div>
+<div class="timeline" id="d-timeline"></div>
+</div>
+
+<script>
+    // ========== 原始邏輯完全保留，未更動任何演算法 ==========
+    const DISHES=['珍珠奶茶','牛肉麵','炸雞排','鹽酥雞','壽司','滷肉飯','麻辣鍋','刈包','臭豆腐','肉圓','虱目魚粥','蚵仔煎','排骨飯','三杯雞','薑母鴨'];
+    const STORES=['幸福小廚','老王便當','阿嬤臭豆腐','海鮮樓','好吃便當'];
+
+    let delSteps=[], delCur=0;
+
+    class MaxHeap2{
+      constructor(){this.h=[]}
+      push(it){this.h.push(it);this._up(this.h.length-1)}
+      pop(){if(!this.h.length)return null;let t=this.h[0];let l=this.h.pop();if(this.h.length){this.h[0]=l;this._dn(0)}return t}
+      get size(){return this.h.length}
+      _up(i){while(i>0){let p=(i-1)>>1;if(this.h[p].priority>=this.h[i].priority)break;[this.h[p],this.h[i]]=[this.h[i],this.h[p]];i=p}}
+      _dn(i){let n=this.h.length;while(true){let s=i,l=2*i+1,r=2*i+2;if(l<n&&this.h[l].priority>this.h[s].priority)s=l;if(r<n&&this.h[r].priority>this.h[s].priority)s=r;if(s===i)break;[this.h[s],this.h[i]]=[this.h[i],this.h[s]];i=s}}
+    }
+
+    function runDel(){
+      let nOrd=Math.min(60,Math.max(5,parseInt(document.getElementById('nOrd').value)||15));
+      let nRider=Math.min(6,Math.max(1,parseInt(document.getElementById('nRider').value)||2));
+      let cd=Math.min(8,Math.max(1,parseInt(document.getElementById('cdRider').value)||3));
+
+      let orders=[];
+      for(let i=0;i<nOrd;i++){
+        let dish=DISHES[Math.floor(Math.random()*DISHES.length)];
+        let store=STORES[Math.floor(Math.random()*STORES.length)];
+        let fine=Math.floor(Math.random()*90)+10;
+        let dist=Math.floor(Math.random()*5)+1;
+        let priority=fine+dist*3;
+        orders.push({id:'#'+(1000+i),dish,store,fine,dist,priority});
+      }
+
+      let heap=new MaxHeap2();
+      for(let o of orders) heap.push({...o});
+
+      let coolQ=[];
+      let time=0,idle=0,done=0,totalEarn=0;
+      let steps=[];
+      let delivered=[];
+      let timeline=[];
+
+      let maxT=nOrd*(cd+1)*nRider+100;
+      while((heap.size>0||coolQ.length>0)&&time<maxT){
+        for(let [rt,,rider] of coolQ.filter(([rt])=>rt<=time)) heap.push({...rider});
+        coolQ=coolQ.filter(([rt])=>rt>time);
+
+        let heapSnap=heap.h.map(x=>({...x}));
+        let qSnap=coolQ.map(x=>[...x]);
+
+        if(heap.size>0){
+          let o=heap.pop();
+          coolQ.push([time+cd+1,'back',{...o,_rider:true}]);
+          done++;totalEarn+=o.fine;
+          delivered.push({...o});
+          timeline.push({t:time,label:o.id,isIdle:false});
+          steps.push({time,idle,done,totalEarn,action:`派單 ${o.id} ${o.dish}（${o.store}，罰款$${o.fine}）`,isIdle:false,heap:heapSnap,queue:qSnap,delivered:[...delivered]});
+        } else {
+          idle++;
+          timeline.push({t:time,label:'—',isIdle:true});
+          steps.push({time,idle,done,totalEarn,action:'騎手全部回程中（Idle）',isIdle:true,heap:heapSnap,queue:qSnap,delivered:[...delivered]});
+        }
+        time++;
+      }
+
+      delSteps=steps;
+      delCur=0;
+      document.getElementById('d-total').textContent=nOrd;
+      renderDelStep();
+    }
+
+    function stepDel(d){
+      if(!delSteps.length)return;
+      if(d===9999)delCur=delSteps.length-1;
+      else delCur=Math.max(0,Math.min(delSteps.length-1,delCur+d));
+      renderDelStep();
+    }
+
+    function priClass(p){return p>=80?'pri1':p>=50?'pri2':'pri3'}
+    function priLabel(p){return p>=80?'急單':'正常'}
+
+    function renderDelStep(){
+      if(!delSteps.length)return;
+      let s=delSteps[delCur];
+      document.getElementById('d-done').textContent=s.done;
+      document.getElementById('d-idle').textContent=s.idle;
+      document.getElementById('d-earn').textContent='$'+s.totalEarn;
+      document.getElementById('d-note').innerHTML=`⏱️ T${s.time}：${s.action}  &nbsp;&nbsp;📌 步驟 ${delCur+1}/${delSteps.length}`;
+
+      let hl=document.getElementById('d-heap');
+      hl.innerHTML=s.heap.length===0?'<div style="font-size:12px;color:var(--color-text-tertiary);padding:12px;text-align:center;">🍽️ 無待派訂單</div>':
+        s.heap.map((o,i)=>`
+          <div class="o-item${i===0?' top':''}">
+            <span class="pri-badge ${priClass(o.priority)}">${priLabel(o.priority)}</span>
+            <span style="font-weight:600; flex:1;">${o.id} ${o.dish}</span>
+            <span style="font-size:0.7rem;color:var(--color-text-tertiary);">${o.store}</span>
+            <span style="font-size:0.7rem;font-weight:600;color:#e76f51;">$${o.fine}</span>
+          </div>`).join('');
+
+      let ql=document.getElementById('d-queue');
+      ql.innerHTML=s.queue.length===0?'<div style="font-size:12px;color:var(--color-text-tertiary);padding:12px;text-align:center;">🛵 無騎手回程中</div>':
+        s.queue.map(([rt,,o])=>`
+          <div class="r-item${rt<=s.time?' ready':''}">
+            <span style="font-weight:500;">${o._rider?'騎手('+o.id+')':'等待回程'}</span>
+            <span style="font-size:0.7rem;color:var(--color-text-tertiary);">${rt<=s.time?'✅ 可接單':'🔁 返回待命 @ T'+rt}</span>
+          </div>`).join('');
+
+      let ev=document.getElementById('d-earnings');
+      ev.innerHTML=s.delivered.map(o=>`<div class="earn-tag">${o.id} ${o.dish} +$${o.fine}</div>`).join('');
+
+      let tl=document.getElementById('d-timeline');
+      let visible=delSteps.slice(0,delCur+1);
+      tl.innerHTML=visible.map(x=>`
+        <div class="tsl ${x.isIdle?'idle':'work'}" title="T${x.time}: ${x.action}">${x.isIdle?'⏸':x.label.replace('#','')}</div>`).join('');
+      tl.scrollTop=tl.scrollHeight;
+    }
+
+    runDel();
+</script>
+</body>
+</html>

@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>金門大學 — 加簽優先權動態評估與分流系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ================================================================
+       CSS 自訂變數 — 以「學術公文紙張」為靈感的米白深褐色系
+       對比色：朱紅（極度迫切）、靛藍（中度迫切）、石綠（一般候補）
+    ================================================================ */
+    :root {
+      --bg:          #f5f0e8;        /* 舊式公文紙底色 */
+      --bg2:         #ede7d9;        /* 次底色 */
+      --surface:     #faf7f2;        /* 卡片底色 */
+      --border:      #d6c9b3;        /* 線條 */
+      --border2:     #c4b49a;        /* 深線條 */
+      --text:        #2c2012;        /* 主文字 */
+      --muted:       #8a7a65;        /* 次文字 */
+      --stamp-red:   #c0392b;        /* 朱紅 — 極度迫切 */
+      --indigo:      #2c4a7c;        /* 靛藍 — 中度迫切 */
+      --sage:        #4a6741;        /* 石綠 — 一般候補 */
+      --gold:        #b8860b;        /* 金色 — 強調 */
+      --shadow:      rgba(44,32,18,0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans TC', sans-serif;
+      min-height: 100vh;
+      /* 細紋紙質背景 */
+      background-image:
+        repeating-linear-gradient(
+          0deg, transparent, transparent 28px,
+          rgba(180,160,130,0.08) 28px, rgba(180,160,130,0.08) 29px
+        );
+    }
+
+    /* ---- 標題字體 ---- */
+    .font-serif { font-family: 'Noto Serif TC', serif; }
+    .mono       { font-family: 'JetBrains Mono', monospace; }
+
+    /* ---- 大標題：印章效果 ---- */
+    .stamp-title {
+      font-family: 'Noto Serif TC', serif;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      color: var(--stamp-red);
+      text-shadow: 2px 2px 0 rgba(192,57,43,0.15);
+    }
+
+    /* ---- 卡片 ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 3px 3px 0 var(--border2), 6px 6px 0 rgba(180,160,130,0.2);
+    }
+
+    /* ---- 區塊標題列 ---- */
+    .section-header {
+      border-bottom: 2px solid var(--border2);
+      padding-bottom: 10px; margin-bottom: 20px;
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .section-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; color: var(--muted);
+      border: 1px solid var(--border2);
+      padding: 1px 6px; border-radius: 2px;
+    }
+    .section-title {
+      font-family: 'Noto Serif TC', serif;
+      font-weight: 700; font-size: 1.05rem; color: var(--text);
+    }
+
+    /* ---- 表單 ---- */
+    select, input[type="number"] {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 2px;
+      color: var(--text);
+      padding: 9px 12px;
+      width: 100%;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 0.875rem;
+      outline: none;
+      appearance: none; -webkit-appearance: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    select:focus, input[type="number"]:focus {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px rgba(44,74,124,0.12);
+    }
+
+    /* ---- 按鈕 ---- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 7px; padding: 10px 20px;
+      border: none; border-radius: 2px;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; transition: all .15s;
+      letter-spacing: 0.04em;
+    }
+    .btn-primary {
+      background: var(--indigo); color: #fff;
+      box-shadow: 2px 2px 0 rgba(44,74,124,0.4);
+    }
+    .btn-primary:hover { background: #1e3660; transform: translate(-1px,-1px); box-shadow: 3px 3px 0 rgba(44,74,124,0.4); }
+    .btn-primary:active { transform: translate(1px,1px); box-shadow: none; }
+
+    .btn-danger {
+      background: var(--stamp-red); color: #fff;
+      box-shadow: 2px 2px 0 rgba(192,57,43,0.4);
+    }
+    .btn-danger:hover { background: #a93226; transform: translate(-1px,-1px); box-shadow: 3px 3px 0 rgba(192,57,43,0.4); }
+    .btn-danger:active { transform: translate(1px,1px); box-shadow: none; }
+
+    .btn-ghost {
+      background: var(--bg2); color: var(--text);
+      border: 1px solid var(--border2);
+      box-shadow: 2px 2px 0 var(--border);
+    }
+    .btn-ghost:hover { background: var(--border); transform: translate(-1px,-1px); }
+    .btn-ghost:active { transform: translate(1px,1px); box-shadow: none; }
+
+    /* ---- 優先分數 badge ---- */
+    .badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 44px; height: 26px;
+      border-radius: 2px; padding: 0 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .badge-high     { background: rgba(192,57,43,0.12); color: var(--stamp-red); border: 1px solid rgba(192,57,43,0.3); }
+    .badge-medium   { background: rgba(44,74,124,0.1);  color: var(--indigo);    border: 1px solid rgba(44,74,124,0.25); }
+    .badge-low      { background: rgba(74,103,65,0.1);  color: var(--sage);      border: 1px solid rgba(74,103,65,0.25); }
+    .badge-failed   { background: rgba(100,80,60,0.1);  color: var(--muted);     border: 1px solid var(--border2); }
+    .badge-granted  { background: rgba(184,134,11,0.1); color: var(--gold);      border: 1px solid rgba(184,134,11,0.3); }
+
+    /* ---- 優先佇列排名卡片 ---- */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes rankChange {
+      0%   { background: rgba(44,74,124,0.2); }
+      100% { background: transparent; }
+    }
+    .student-row {
+      animation: slideDown .3s cubic-bezier(.22,1,.36,1) forwards;
+      display: grid;
+      grid-template-columns: 32px 1fr auto auto auto;
+      align-items: center; gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--bg2);
+      font-size: 0.83rem;
+      transition: background .2s;
+      position: relative;
+    }
+    .student-row:last-child { border-bottom: none; }
+    .student-row.rank-changed { animation: rankChange .6s ease forwards; }
+    .student-row.failed {
+      opacity: 0.45;
+      text-decoration: line-through;
+    }
+    .student-row.granted {
+      background: rgba(184,134,11,0.06);
+    }
+
+    /* 排名數字 */
+    .rank-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 600;
+      color: var(--muted); text-align: center;
+    }
+    .rank-num.top { color: var(--stamp-red); font-size: 0.82rem; }
+
+    /* ---- 統計大數字 ---- */
+    .stat-big {
+      font-family: 'Noto Serif TC', serif;
+      font-size: 2rem; font-weight: 900; line-height: 1;
+    }
+
+    /* ---- 決策樹可視化 ---- */
+    .dt-node {
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      border-radius: 3px;
+      padding: 5px 12px;
+      font-size: 0.72rem; font-weight: 500;
+      white-space: nowrap; text-align: center;
+      transition: all .2s;
+    }
+    .dt-line { background: var(--border2); }
+    .dt-active-high   { background: rgba(192,57,43,0.12); border-color: var(--stamp-red); color: var(--stamp-red); font-weight: 700; }
+    .dt-active-medium { background: rgba(44,74,124,0.12); border-color: var(--indigo);    color: var(--indigo);    font-weight: 700; }
+    .dt-active-low    { background: rgba(74,103,65,0.12); border-color: var(--sage);      color: var(--sage);      font-weight: 700; }
+    .dt-active-root   { background: rgba(184,134,11,0.1); border-color: var(--gold);      color: var(--gold);      font-weight: 700; }
+
+    /* ---- 進度條 ---- */
+    .prog-track { background: var(--bg2); border-radius: 2px; height: 7px; overflow: hidden; border: 1px solid var(--border); }
+    .prog-fill  { height: 100%; border-radius: 2px; transition: width .5s ease; }
+
+    /* ---- Toast ---- */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      background: var(--surface); border: 1px solid var(--border2);
+      color: var(--text); padding: 12px 18px; border-radius: 3px;
+      font-size: 0.82rem; max-width: 310px;
+      box-shadow: 4px 4px 0 var(--border2);
+      transform: translateY(70px); opacity: 0;
+      transition: all .28s cubic-bezier(.22,1,.36,1);
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ---- 捲動條 ---- */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ---- 浮水印標章 ---- */
+    .watermark {
+      position: absolute; right: 18px; top: 14px;
+      font-family: 'Noto Serif TC', serif;
+      font-size: 0.6rem; color: var(--border2);
+      letter-spacing: 0.15em; writing-mode: vertical-rl;
+      pointer-events: none; user-select: none;
+    }
+
+    /* ---- 圖例 ---- */
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+    /* ---- 名額數字輸入 ---- */
+    .quota-box {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .quota-box input {
+      width: 70px; text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem; font-weight: 600;
+    }
+
+    /* ---- 已滿名額提示 ---- */
+    .quota-full {
+      background: rgba(192,57,43,0.08);
+      border: 1px solid rgba(192,57,43,0.25);
+      color: var(--stamp-red);
+      border-radius: 3px; padding: 6px 12px;
+      font-size: 0.8rem; font-weight: 600;
+      display: none;
+    }
+  </style>
+</head>
+<body class="pb-24">
+
+<!-- ================================================================
+     頁首
+================================================================ -->
+<header style="border-bottom: 2px solid var(--border2); background: var(--surface);">
+  <div class="max-w-7xl mx-auto px-5 py-5 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div>
+      <div class="text-xs mono text-muted mb-1" style="color:var(--muted); letter-spacing:0.1em;">
+        國立金門大學 · 教務處選課系統 · 加簽管理模組
+      </div>
+      <h1 class="stamp-title text-2xl sm:text-3xl">加簽優先權動態評估與分流系統</h1>
+      <p class="text-xs mt-1" style="color:var(--muted);">
+        Decision Tree Classification × Priority Queue Scheduling
+      </p>
+    </div>
+    <div class="flex items-center gap-4">
+      <div id="clock" class="mono text-xs" style="color:var(--muted);"></div>
+      <span class="text-xs font-mono px-2 py-1 rounded-sm" style="background:rgba(44,74,124,0.1); color:var(--indigo); border:1px solid rgba(44,74,124,0.2);">
+        DEMO MODE
+      </span>
+    </div>
+  </div>
+</header>
+
+<!-- ================================================================
+     主體
+================================================================ -->
+<main class="max-w-7xl mx-auto px-5 mt-7 grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+  <!-- ============================================================
+       左欄：申請表單 + 決策樹圖 (2/5)
+  ============================================================ -->
+  <div class="lg:col-span-2 flex flex-col gap-6">
+
+    <!-- 申請表單 -->
+    <div class="card p-6 relative" style="position:relative;">
+      <div class="watermark">金門大學教務處</div>
+
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <span class="section-title">學生加簽申請</span>
+      </div>
+
+      <!-- 課程選擇 -->
+      <div class="mb-4 p-3 rounded-sm" style="background:var(--bg2); border:1px dashed var(--border2);">
+        <div class="text-xs mb-1" style="color:var(--muted);">申請課程（模擬）</div>
+        <div class="font-serif font-semibold text-sm" style="color:var(--text);">
+          KMU-CS401 ▸ 資料結構與演算法
+        </div>
+        <div class="text-xs mt-0.5 mono" style="color:var(--muted);">授課教師：林教授 ｜ 剩餘名額：由右側設定</div>
+      </div>
+
+      <div class="flex flex-col gap-4">
+
+        <!-- 學號 -->
+        <div>
+          <label class="block text-xs font-medium mb-1.5" style="color:var(--muted);">學生學號 <span style="color:var(--stamp-red);">*</span></label>
+          <div class="relative">
+            <input type="text" id="inputSid" placeholder="e.g. B11201234" class="w-full"
+              style="background:var(--bg2);border:1px solid var(--border2);border-radius:2px;color:var(--text);padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:0.875rem;outline:none;width:100%;transition:border-color .15s;" />
+          </div>
+        </div>
+
+        <!-- 年級 -->
+        <div>
+          <label class="block text-xs font-medium mb-1.5" style="color:var(--muted);">年級 <span style="color:var(--stamp-red);">*</span></label>
+          <div class="relative">
+            <select id="inputGrade">
+              <option value="">— 請選擇 —</option>
+              <option value="senior">🎓 大四 / 延畢生</option>
+              <option value="junior">📘 大三</option>
+              <option value="fresh">📗 大一 / 大二</option>
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style="color:var(--muted);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <!-- 課程屬性 -->
+        <div>
+          <label class="block text-xs font-medium mb-1.5" style="color:var(--muted);">課程屬性 <span style="color:var(--stamp-red);">*</span></label>
+          <div class="relative">
+            <select id="inputCourse">
+              <option value="">— 請選擇 —</option>
+              <option value="required">📌 主系必修 / 畢業核心</option>
+              <option value="elective">📎 他系選修</option>
+              <option value="general">📋 通識 / 湊學分</option>
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style="color:var(--muted);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <!-- 目前學分 -->
+        <div>
+          <label class="block text-xs font-medium mb-1.5" style="color:var(--muted);">目前已選學分數 <span style="color:var(--stamp-red);">*</span></label>
+          <div class="relative">
+            <select id="inputCredit">
+              <option value="">— 請選擇 —</option>
+              <option value="low">⚠️ 低於最低門檻</option>
+              <option value="normal">✅ 正常範圍</option>
+              <option value="full">🔒 已滿學分</option>
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style="color:var(--muted);" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+
+        <!-- 按鈕 -->
+        <div class="flex gap-3 pt-1">
+          <button class="btn btn-primary flex-1" onclick="submitApplication()">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            送出加簽申請
+          </button>
+          <button class="btn btn-ghost" onclick="randomApplication()">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            隨機
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 決策樹視覺化 -->
+    <div class="card p-5">
+      <div class="section-header">
+        <span class="section-num">DT</span>
+        <span class="section-title">決策樹路徑圖</span>
+      </div>
+
+      <div class="flex flex-col items-center gap-0 text-center" style="font-size:0.7rem;">
+
+        <!-- Root -->
+        <div id="dt-root" class="dt-node" style="min-width:160px;">📋 加簽申請進入</div>
+        <div class="dt-line" style="width:2px; height:16px;"></div>
+
+        <!-- Level 1: 年級 -->
+        <div id="dt-grade" class="dt-node" style="min-width:160px;">🎓 年級判斷</div>
+        <div class="dt-line" style="width:2px; height:12px;"></div>
+
+        <!-- 三分支 -->
+        <div class="flex gap-2 justify-center w-full">
+          <!-- 大四延畢 -->
+          <div class="flex flex-col items-center gap-0">
+            <div id="dt-g-senior" class="dt-node" style="min-width:75px;">大四 / 延畢</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-c-senior" class="dt-node" style="min-width:75px;">課程屬性?</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-cr-senior" class="dt-node" style="min-width:75px;">學分狀況?</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-high" class="dt-node" style="color:var(--stamp-red); border-color:var(--stamp-red); min-width:75px;">🔴 極度迫切</div>
+          </div>
+          <!-- 大三 -->
+          <div class="flex flex-col items-center gap-0">
+            <div id="dt-g-junior" class="dt-node" style="min-width:75px;">大三</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-c-junior" class="dt-node" style="min-width:75px;">課程/學分?</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-medium" class="dt-node" style="color:var(--indigo); border-color:var(--indigo); min-width:75px;">🔵 中度迫切</div>
+          </div>
+          <!-- 低年級 -->
+          <div class="flex flex-col items-center gap-0">
+            <div id="dt-g-fresh" class="dt-node" style="min-width:75px;">大一 / 大二</div>
+            <div class="dt-line" style="width:2px; height:12px;"></div>
+            <div id="dt-low" class="dt-node" style="color:var(--sage); border-color:var(--sage); min-width:75px;">🟢 一般候補</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 圖例 -->
+      <div class="mt-5 flex flex-col gap-1.5" style="font-size:0.72rem; color:var(--muted);">
+        <div class="flex items-center gap-2"><span class="legend-dot" style="background:var(--stamp-red);"></span> 極度迫切 (High)：分數 90–100</div>
+        <div class="flex items-center gap-2"><span class="legend-dot" style="background:var(--indigo);"></span> 中度迫切 (Medium)：分數 60–89</div>
+        <div class="flex items-center gap-2"><span class="legend-dot" style="background:var(--sage);"></span> 一般候補 (Low)：分數 10–59</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       右欄：優先佇列看板 + 統計 (3/5)
+  ============================================================ -->
+  <div class="lg:col-span-3 flex flex-col gap-6">
+
+    <!-- 教授控制台 -->
+    <div class="card p-5">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <span class="section-title">教授授權碼發放控制台</span>
+      </div>
+
+      <div class="flex flex-wrap gap-4 items-end">
+
+        <!-- 名額設定 -->
+        <div class="flex-1 min-w-40">
+          <label class="block text-xs font-medium mb-1.5" style="color:var(--muted);">本課剩餘加簽名額</label>
+          <div class="quota-box">
+            <button class="btn btn-ghost" style="padding:8px 12px; font-size:1rem;" onclick="changeQuota(-1)">−</button>
+            <input type="number" id="quotaInput" value="5" min="0" max="50"
+              onchange="onQuotaChange()"
+              style="background:var(--bg2);border:1px solid var(--border2);border-radius:2px;color:var(--text);padding:8px;font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:600;outline:none;width:70px;text-align:center;" />
+            <button class="btn btn-ghost" style="padding:8px 12px; font-size:1rem;" onclick="changeQuota(1)">＋</button>
+            <span class="text-xs ml-1" style="color:var(--muted);">人</span>
+          </div>
+        </div>
+
+        <!-- 發放按鈕 -->
+        <div class="flex gap-3">
+          <button class="btn btn-danger" onclick="grantNext()">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+            教授發放授權碼 (DeQueue)
+          </button>
+          <button class="btn btn-ghost" onclick="grantAll()">全部錄取</button>
+        </div>
+
+      </div>
+
+      <!-- 名額進度條 -->
+      <div class="mt-4">
+        <div class="flex justify-between text-xs mb-1.5" style="color:var(--muted);">
+          <span>名額使用率</span>
+          <span id="quota-label">已發放 0 / 5 人</span>
+        </div>
+        <div class="prog-track">
+          <div id="quota-prog" class="prog-fill" style="background:var(--stamp-red); width:0%;"></div>
+        </div>
+      </div>
+
+      <!-- 名額滿提示 -->
+      <div id="quota-full-msg" class="quota-full mt-3">
+        ⛔ 本堂課名額已滿，加簽已截止。剩餘候補學生將收到加簽失敗通知。
+      </div>
+    </div>
+
+    <!-- 優先佇列看板 -->
+    <div class="card" style="overflow:hidden;">
+      <div class="p-5 pb-0">
+        <div class="section-header">
+          <span class="section-num">PQ</span>
+          <span class="section-title">加簽候補優先佇列 (Priority Queue)</span>
+          <span id="queue-count-badge" class="mono text-xs ml-auto px-2 py-0.5 rounded-sm"
+            style="background:var(--bg2); border:1px solid var(--border2); color:var(--muted);">0 人等待</span>
+        </div>
+        <p class="text-xs mb-4" style="color:var(--muted);">
+          依迫切度分數自動排序 — 分數越高自動插隊越前。使用 <code class="mono" style="font-size:0.72rem; background:var(--bg2); padding:1px 4px; border-radius:2px;">Array.sort()</code> 模擬 Priority Queue。
+        </p>
+      </div>
+
+      <!-- 表頭 -->
+      <div class="px-5 py-2 text-xs font-medium grid"
+        style="grid-template-columns:32px 1fr auto auto auto; gap:10px; background:var(--bg2); border-bottom:1px solid var(--border2); color:var(--muted); letter-spacing:0.05em;">
+        <span>#</span>
+        <span>學生資訊</span>
+        <span class="text-center">迫切度</span>
+        <span class="text-center">分數</span>
+        <span class="text-center">狀態</span>
+      </div>
+
+      <!-- 佇列列表 -->
+      <div id="queue-list" style="max-height: 420px; overflow-y: auto;">
+        <!-- 空狀態 -->
+        <div id="queue-empty" class="py-10 text-center text-sm" style="color:var(--muted);">
+          <div class="text-2xl mb-2">📭</div>
+          目前尚無加簽申請，請由左側表單送出
+        </div>
+      </div>
+    </div>
+
+    <!-- 統計看板 -->
+    <div class="card p-5">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">即時統計看板</span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+        <!-- 總申請 -->
+        <div class="p-4 rounded-sm" style="background:var(--bg2); border:1px solid var(--border);">
+          <div class="text-xs mb-1" style="color:var(--muted);">總申請人數</div>
+          <div class="stat-big" id="stat-total" style="color:var(--text);">0</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">人</div>
+        </div>
+        <!-- 已錄取 -->
+        <div class="p-4 rounded-sm" style="background:var(--bg2); border:1px solid var(--border);">
+          <div class="text-xs mb-1" style="color:var(--muted);">已錄取</div>
+          <div class="stat-big" id="stat-granted" style="color:var(--gold);">0</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">人</div>
+        </div>
+        <!-- 排隊中 -->
+        <div class="p-4 rounded-sm" style="background:var(--bg2); border:1px solid var(--border);">
+          <div class="text-xs mb-1" style="color:var(--muted);">排隊中</div>
+          <div class="stat-big" id="stat-waiting" style="color:var(--indigo);">0</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">人</div>
+        </div>
+        <!-- 大四保障率 -->
+        <div class="p-4 rounded-sm" style="background:var(--bg2); border:1px solid var(--border);">
+          <div class="text-xs mb-1" style="color:var(--muted);">大四保障率</div>
+          <div class="stat-big" id="stat-senior-rate" style="color:var(--stamp-red);">0%</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">已錄取大四生/總大四申請</div>
+        </div>
+      </div>
+
+      <!-- 迫切度分佈長條圖 -->
+      <div class="mb-4">
+        <div class="text-xs font-medium mb-3" style="color:var(--muted); letter-spacing:0.06em;">申請人迫切度分佈（累計）</div>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-14" style="color:var(--stamp-red);">HIGH</span>
+            <div class="flex-1 prog-track">
+              <div id="bar-high" class="prog-fill" style="background:var(--stamp-red); width:0%;"></div>
+            </div>
+            <span id="cnt-high" class="mono text-xs w-6 text-right" style="color:var(--muted);">0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-14" style="color:var(--indigo);">MEDIUM</span>
+            <div class="flex-1 prog-track">
+              <div id="bar-medium" class="prog-fill" style="background:var(--indigo); width:0%;"></div>
+            </div>
+            <span id="cnt-medium" class="mono text-xs w-6 text-right" style="color:var(--muted);">0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-14" style="color:var(--sage);">LOW</span>
+            <div class="flex-1 prog-track">
+              <div id="bar-low" class="prog-fill" style="background:var(--sage); width:0%;"></div>
+            </div>
+            <span id="cnt-low" class="mono text-xs w-6 text-right" style="color:var(--muted);">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 授權碼發放日誌 -->
+      <div>
+        <div class="text-xs font-medium mb-2" style="color:var(--muted); letter-spacing:0.06em;">最近授權碼發放記錄</div>
+        <div id="grant-log" class="mono text-xs space-y-1" style="max-height:100px; overflow-y:auto; color:var(--muted);">
+          <div style="color:var(--border2);">— 尚未發放任何授權碼 —</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ================================================================
+     JavaScript 核心邏輯
+================================================================ -->
+<script>
+// ================================================================
+//  金門大學 — 加簽優先權動態評估與分流系統
+//  核心概念：
+//    1. Rule-based Decision Tree  → 計算每位學生的迫切度分數
+//    2. Priority Queue (以 Array.sort 模擬) → 依分數排序候補佇列
+// ================================================================
+
+// ----------------------------------------------------------------
+// 1. 全域狀態
+// ----------------------------------------------------------------
+let appCounter  = 0;          // 申請流水號（自動遞增）
+let quota       = 5;          // 本堂課剩餘名額（可由 UI 調整）
+let quotaUsed   = 0;          // 已發放授權碼數
+
+// 統計用累計量
+const levelCount = { high: 0, medium: 0, low: 0 }; // 各迫切度總申請數
+
+// 已發放授權碼日誌
+const grantLog = [];
+
+/**
+ * Priority Queue — 使用 JavaScript 陣列模擬
+ *
+ * 每個元素為一個 application 物件：
+ * {
+ *   id:      'APP-0001',
+ *   sid:     'B11201234',   // 學號
+ *   grade:   'senior' | 'junior' | 'fresh',
+ *   course:  'required' | 'elective' | 'general',
+ *   credit:  'low' | 'normal' | 'full',
+ *   level:   'high' | 'medium' | 'low',   // 決策樹分類結果
+ *   score:   number,                       // 迫切度分數 (10–100)
+ *   status:  'waiting' | 'granted' | 'failed',
+ *   submittedAt: number   // Date.now()
+ * }
+ *
+ * Priority Queue 關鍵操作：
+ *   Enqueue → push 後立即執行 sort，保持高分在前
+ *   DeQueue → shift()，取出分數最高（陣列第一個）元素
+ */
+const priorityQueue = [];
+
+// ----------------------------------------------------------------
+// 2. 決策樹：計算迫切度等級與分數
+// ----------------------------------------------------------------
+/**
+ * classifyUrgency(grade, course, credit)
+ *
+ * 規則基礎決策樹（Rule-based Decision Tree）
+ * 樹狀結構：
+ *
+ *            [新加簽申請]
+ *                  │
+ *           ┌──────┴──────┐
+ *           │  年級判斷    │  ← Feature 1
+ *           └──┬───┬───┬──┘
+ *      大四延畢  │ 大三 │ 大一/大二
+ *              │     │       └──→ LOW (10~59)
+ *              │     └──→ 課程/學分加成 → MEDIUM (60~89)
+ *              └──→ 課程屬性 + 學分狀況 → HIGH or MEDIUM
+ *
+ * @param {string} grade   - 'senior' | 'junior' | 'fresh'
+ * @param {string} course  - 'required' | 'elective' | 'general'
+ * @param {string} credit  - 'low' | 'normal' | 'full'
+ * @returns {{ level: string, score: number }}
+ */
+function classifyUrgency(grade, course, credit) {
+
+  // ── 節點 A：大四 / 延畢生 ──────────────────────────────────
+  if (grade === 'senior') {
+
+    // 狀況 A（極度迫切）：必修 + 學分低 → 最危急，幾乎一定無法畢業
+    if (course === 'required' && credit === 'low') {
+      return { level: 'high', score: randInt(95, 100) };
+    }
+
+    // 大四必修但學分正常
+    if (course === 'required' && credit === 'normal') {
+      return { level: 'high', score: randInt(88, 94) };
+    }
+
+    // 大四選修 或 學分偏低（仍有一定迫切性）
+    if (course === 'elective' || credit === 'low') {
+      return { level: 'medium', score: randInt(72, 87) };
+    }
+
+    // 大四通識 / 學分已滿 → 迫切度稍降
+    return { level: 'medium', score: randInt(62, 71) };
+  }
+
+  // ── 節點 B：大三 ─────────────────────────────────────────
+  if (grade === 'junior') {
+
+    // 大三必修 + 學分偏低 → 中高迫切
+    if (course === 'required' && credit === 'low') {
+      return { level: 'medium', score: randInt(78, 89) };
+    }
+
+    // 大三必修（學分正常）
+    if (course === 'required') {
+      return { level: 'medium', score: randInt(66, 77) };
+    }
+
+    // 大三選修 / 通識
+    return { level: 'low', score: randInt(40, 59) };
+  }
+
+  // ── 節點 C：大一 / 大二（低年級）──────────────────────────
+  // 時間還多，加簽失敗影響較小
+  if (course === 'required' && credit === 'low') {
+    // 雖是低年級，但必修且學分嚴重不足 → 給予中等機會
+    return { level: 'low', score: randInt(45, 58) };
+  }
+
+  // 一般低年級候補
+  return { level: 'low', score: randInt(10, 44) };
+}
+
+// ----------------------------------------------------------------
+// 3. Priority Queue 操作
+// ----------------------------------------------------------------
+/**
+ * pqEnqueue(application)
+ *
+ * 將新申請加入佇列後，立即以 Array.sort() 依分數由高到低重新排序。
+ * 這是「優先佇列」的核心：新元素加入後，高優先度者自動前移。
+ *
+ * 時間複雜度：O(n log n)（每次入隊觸發完整排序）
+ * 若追求 O(log n)，可改用 Min-Heap / Max-Heap 實作。
+ */
+function pqEnqueue(app) {
+  priorityQueue.push(app);
+
+  // ── Priority Queue 核心排序 ──
+  // 依 score 由大到小排序；若分數相同，先申請者（id 較小）排前面
+  priorityQueue.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score; // 主鍵：分數降冪
+    return a.id.localeCompare(b.id);                   // 次鍵：申請先後
+  });
+}
+
+/**
+ * pqDequeue()
+ *
+ * 從佇列前端（分數最高）移除並回傳一個元素。
+ * Array.shift() = 移除並回傳索引 0 的元素（O(n)）。
+ */
+function pqDequeue() {
+  // 只允許移除狀態為 'waiting' 的第一筆
+  const idx = priorityQueue.findIndex(a => a.status === 'waiting');
+  if (idx === -1) return null;
+  const app = priorityQueue[idx];
+  app.status = 'granted';
+  return app;
+}
+
+// ----------------------------------------------------------------
+// 4. 送出加簽申請（主入口）
+// ----------------------------------------------------------------
+function submitApplication() {
+  const sid    = document.getElementById('inputSid').value.trim();
+  const grade  = document.getElementById('inputGrade').value;
+  const course = document.getElementById('inputCourse').value;
+  const credit = document.getElementById('inputCredit').value;
+
+  // 基本驗證
+  if (!grade || !course || !credit) {
+    showToast('⚠️ 請完整填寫年級、課程屬性與學分狀況！');
+    return;
+  }
+  if (!sid) {
+    showToast('⚠️ 請填寫學號！');
+    return;
+  }
+
+  // 學號重複檢查
+  if (priorityQueue.some(a => a.sid === sid)) {
+    showToast(`⚠️ 學號 ${sid} 已提出申請，不可重複送出！`);
+    return;
+  }
+
+  appCounter++;
+  const { level, score } = classifyUrgency(grade, course, credit);
+
+  // 建立申請物件
+  const app = {
+    id:          'APP-' + String(appCounter).padStart(4, '0'),
+    sid:         sid || `B${Date.now().toString().slice(-8)}`,
+    grade, course, credit, level, score,
+    status:      'waiting',
+    submittedAt: Date.now(),
+  };
+
+  // ── Priority Queue Enqueue ──
+  pqEnqueue(app);
+
+  // 統計累計
+  levelCount[level]++;
+
+  // 高亮決策樹
+  highlightDT(grade, course, credit, level);
+
+  // 顯示 toast
+  const levelLabel = { high: '🔴 極度迫切', medium: '🔵 中度迫切', low: '🟢 一般候補' };
+  showToast(`${app.id} 已加入佇列，分類：${levelLabel[level]}，分數：${score}`);
+
+  // 更新 UI
+  renderQueue();
+  updateStats();
+
+  // 清空學號
+  document.getElementById('inputSid').value = '';
+}
+
+// ----------------------------------------------------------------
+// 5. 隨機申請
+// ----------------------------------------------------------------
+function randomApplication() {
+  const grades   = ['senior', 'junior', 'fresh'];
+  const courses  = ['required', 'elective', 'general'];
+  const credits  = ['low', 'normal', 'full'];
+  const prefix   = ['B112', 'B113', 'B114', 'B111'];
+  const sidNum   = String(Math.floor(Math.random() * 90000) + 10000);
+
+  document.getElementById('inputGrade').value  = grades[Math.floor(Math.random() * grades.length)];
+  document.getElementById('inputCourse').value = courses[Math.floor(Math.random() * courses.length)];
+  document.getElementById('inputCredit').value = credits[Math.floor(Math.random() * credits.length)];
+  document.getElementById('inputSid').value    = prefix[Math.floor(Math.random() * prefix.length)] + sidNum;
+
+  showToast('🎲 隨機填入完成，請確認後按「送出加簽申請」');
+}
+
+// ----------------------------------------------------------------
+// 6. 教授發放授權碼（DeQueue）
+// ----------------------------------------------------------------
+function grantNext() {
+  const remaining = quota - quotaUsed;
+
+  if (remaining <= 0) {
+    showToast('⛔ 名額已滿，無法繼續發放授權碼！');
+    document.getElementById('quota-full-msg').style.display = 'block';
+    markFailedAll();
+    renderQueue();
+    return;
+  }
+
+  // 從 Priority Queue 前端取出分數最高的候補學生
+  const app = pqDequeue();
+
+  if (!app) {
+    showToast('📭 候補佇列為空，目前無待處理申請。');
+    return;
+  }
+
+  quotaUsed++;
+
+  // 更新名額進度條
+  updateQuotaBar();
+
+  // 寫入日誌
+  const ts = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+  const lvLabel = { high: '極度迫切', medium: '中度迫切', low: '一般候補' };
+  grantLog.unshift(`${ts}  ✅ ${app.sid}（${lvLabel[app.level]}，${app.score}分）─ 授權碼已發放`);
+  if (grantLog.length > 15) grantLog.pop();
+
+  // 若名額已滿，標示其餘人失敗
+  if (quotaUsed >= quota) {
+    markFailedAll();
+    document.getElementById('quota-full-msg').style.display = 'block';
+  }
+
+  showToast(`✅ 授權碼已發放給 ${app.sid}（分數 ${app.score}）`);
+
+  renderQueue();
+  updateStats();
+}
+
+function grantAll() {
+  const waiting = priorityQueue.filter(a => a.status === 'waiting');
+  if (waiting.length === 0) { showToast('📭 沒有等待中的申請。'); return; }
+  const remaining = quota - quotaUsed;
+  const toGrant = Math.min(remaining, waiting.length);
+  for (let i = 0; i < toGrant; i++) grantNext();
+  if (toGrant === 0) showToast('⛔ 名額已滿！');
+}
+
+/** 將剩餘 waiting 標示為 failed */
+function markFailedAll() {
+  priorityQueue.forEach(a => {
+    if (a.status === 'waiting') a.status = 'failed';
+  });
+}
+
+// ----------------------------------------------------------------
+// 7. 名額調整
+// ----------------------------------------------------------------
+function changeQuota(delta) {
+  const input = document.getElementById('quotaInput');
+  let val = parseInt(input.value) + delta;
+  val = Math.max(quotaUsed, Math.min(50, val));
+  input.value = val;
+  onQuotaChange();
+}
+function onQuotaChange() {
+  const val = parseInt(document.getElementById('quotaInput').value) || 0;
+  quota = Math.max(quotaUsed, val);
+  document.getElementById('quotaInput').value = quota;
+  updateQuotaBar();
+  // 若名額擴增，重新開放失敗學生
+  if (quotaUsed < quota) {
+    priorityQueue.forEach(a => { if (a.status === 'failed') a.status = 'waiting'; });
+    document.getElementById('quota-full-msg').style.display = 'none';
+    renderQueue();
+    updateStats();
+  }
+}
+function updateQuotaBar() {
+  const pct = quota > 0 ? Math.round(quotaUsed / quota * 100) : 0;
+  document.getElementById('quota-prog').style.width = pct + '%';
+  document.getElementById('quota-label').textContent = `已發放 ${quotaUsed} / ${quota} 人`;
+}
+
+// ----------------------------------------------------------------
+// 8. 渲染優先佇列 UI
+// ----------------------------------------------------------------
+/**
+ * renderQueue()
+ * 根據 priorityQueue 陣列當前狀態，重新繪製佇列列表。
+ * 陣列已由 pqEnqueue 的 sort() 保持優先順序，直接遍歷即可。
+ */
+function renderQueue() {
+  const container = document.getElementById('queue-list');
+  const emptyMsg  = document.getElementById('queue-empty');
+
+  if (priorityQueue.length === 0) {
+    emptyMsg.style.display = 'block';
+    container.innerHTML = '';
+    container.appendChild(emptyMsg);
+    document.getElementById('queue-count-badge').textContent = '0 人等待';
+    return;
+  }
+
+  emptyMsg.style.display = 'none';
+
+  // 計算等待中人數（排除已錄取/失敗）
+  const waitingCount = priorityQueue.filter(a => a.status === 'waiting').length;
+  document.getElementById('queue-count-badge').textContent = `${waitingCount} 人等待`;
+
+  // 標籤 Map
+  const gradeLabel  = { senior: '大四/延畢', junior: '大三', fresh: '大一/大二' };
+  const courseLabel = { required: '必修', elective: '選修', general: '通識' };
+  const creditLabel = { low: '學分不足', normal: '正常', full: '已滿' };
+  const levelCls    = { high: 'badge-high', medium: 'badge-medium', low: 'badge-low' };
+  const levelTxt    = { high: '極度迫切', medium: '中度迫切', low: '一般候補' };
+
+  let rankCount = 0;  // 僅對 waiting 計算排名
+
+  const rows = priorityQueue.map((app, idx) => {
+    let rankDisplay = '—';
+    let rankClass   = 'rank-num';
+    if (app.status === 'waiting') {
+      rankCount++;
+      rankDisplay = String(rankCount);
+      if (rankCount <= 3) rankClass = 'rank-num top';
+    }
+
+    const statusBadge = {
+      waiting: `<span class="badge" style="font-size:0.68rem; background:rgba(44,74,124,0.08); color:var(--indigo); border:1px solid rgba(44,74,124,0.2);">候補中</span>`,
+      granted: `<span class="badge badge-granted" style="font-size:0.68rem;">✅ 錄取</span>`,
+      failed:  `<span class="badge badge-failed" style="font-size:0.68rem;">❌ 失敗</span>`,
+    }[app.status];
+
+    const rowClass = app.status === 'failed' ? 'student-row failed'
+                   : app.status === 'granted' ? 'student-row granted'
+                   : 'student-row';
+
+    return `
+      <div class="${rowClass}" style="animation-delay:${idx * 0.03}s;">
+        <div class="${rankClass}">${rankDisplay}</div>
+        <div>
+          <div class="mono font-semibold" style="font-size:0.78rem; color:var(--text);">${app.sid}</div>
+          <div style="font-size:0.7rem; color:var(--muted);">
+            ${gradeLabel[app.grade]} · ${courseLabel[app.course]} · ${creditLabel[app.credit]}
+          </div>
+        </div>
+        <div class="text-center">
+          <span class="badge ${levelCls[app.level]}" style="font-size:0.65rem;">${levelTxt[app.level]}</span>
+        </div>
+        <div class="text-center mono font-bold" style="font-size:0.88rem; color:${
+          app.level === 'high' ? 'var(--stamp-red)' :
+          app.level === 'medium' ? 'var(--indigo)' : 'var(--sage)'
+        };">${app.score}</div>
+        <div class="text-center">${statusBadge}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = rows;
+}
+
+// ----------------------------------------------------------------
+// 9. 更新統計看板
+// ----------------------------------------------------------------
+function updateStats() {
+  const total   = priorityQueue.length;
+  const granted = priorityQueue.filter(a => a.status === 'granted').length;
+  const waiting = priorityQueue.filter(a => a.status === 'waiting').length;
+
+  document.getElementById('stat-total').textContent   = total;
+  document.getElementById('stat-granted').textContent = granted;
+  document.getElementById('stat-waiting').textContent = waiting;
+
+  // 大四保障率 = 已錄取的大四生 / 所有大四申請者
+  const seniorTotal   = priorityQueue.filter(a => a.grade === 'senior').length;
+  const seniorGranted = priorityQueue.filter(a => a.grade === 'senior' && a.status === 'granted').length;
+  const rate = seniorTotal > 0 ? Math.round(seniorGranted / seniorTotal * 100) : 0;
+  document.getElementById('stat-senior-rate').textContent = rate + '%';
+
+  // 迫切度長條圖（依累計總申請數）
+  const grandTotal = total || 1;
+  ['high', 'medium', 'low'].forEach(lv => {
+    const cnt = priorityQueue.filter(a => a.level === lv).length;
+    document.getElementById('bar-' + lv).style.width = Math.round(cnt / grandTotal * 100) + '%';
+    document.getElementById('cnt-' + lv).textContent = cnt;
+  });
+
+  // 更新授權碼日誌
+  const logEl = document.getElementById('grant-log');
+  if (grantLog.length > 0) {
+    logEl.innerHTML = grantLog.map(l => `<div>${l}</div>`).join('');
+  }
+}
+
+// ----------------------------------------------------------------
+// 10. 決策樹高亮
+// ----------------------------------------------------------------
+function highlightDT(grade, course, credit, level) {
+  // 清除全部
+  const ids = ['dt-root','dt-grade','dt-g-senior','dt-g-junior','dt-g-fresh',
+                'dt-c-senior','dt-cr-senior','dt-c-junior','dt-high','dt-medium','dt-low'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'dt-node';
+  });
+
+  const levelCls = { high: 'dt-node dt-active-high', medium: 'dt-node dt-active-medium', low: 'dt-node dt-active-low' };
+
+  document.getElementById('dt-root').className  = 'dt-node dt-active-root';
+  document.getElementById('dt-grade').className = 'dt-node dt-active-root';
+
+  if (grade === 'senior') {
+    document.getElementById('dt-g-senior').className  = levelCls[level];
+    document.getElementById('dt-c-senior').className  = levelCls[level];
+    document.getElementById('dt-cr-senior').className = levelCls[level];
+    document.getElementById('dt-high').className   = level === 'high'   ? levelCls.high   : 'dt-node';
+    document.getElementById('dt-medium').className = level === 'medium' ? levelCls.medium : 'dt-node';
+  } else if (grade === 'junior') {
+    document.getElementById('dt-g-junior').className = levelCls[level];
+    document.getElementById('dt-c-junior').className = levelCls[level];
+    document.getElementById('dt-medium').className = level === 'medium' ? levelCls.medium : 'dt-node';
+    document.getElementById('dt-low').className    = level === 'low'    ? levelCls.low    : 'dt-node';
+  } else {
+    document.getElementById('dt-g-fresh').className = levelCls.low;
+    document.getElementById('dt-low').className     = levelCls.low;
+  }
+
+  // 3 秒後清除高亮
+  setTimeout(() => ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'dt-node';
+    // 恢復葉節點的固定顏色
+    if (id === 'dt-high')   el && (el.style.color = 'var(--stamp-red)', el.style.borderColor = 'var(--stamp-red)');
+    if (id === 'dt-medium') el && (el.style.color = 'var(--indigo)',    el.style.borderColor = 'var(--indigo)');
+    if (id === 'dt-low')    el && (el.style.color = 'var(--sage)',      el.style.borderColor = 'var(--sage)');
+  }), 3000);
+}
+
+// ----------------------------------------------------------------
+// 11. 工具函式
+// ----------------------------------------------------------------
+/** 隨機整數 [min, max] */
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** Toast 通知 */
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+/** 即時時鐘 */
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('zh-TW', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ----------------------------------------------------------------
+// 12. 預熱示範資料（頁面載入自動加入 5 筆示範申請）
+// ----------------------------------------------------------------
+(function seedData() {
+  const demos = [
+    { sid: 'B11023001', grade: 'senior', course: 'required', credit: 'low'    },
+    { sid: 'B11123045', grade: 'senior', course: 'elective', credit: 'normal' },
+    { sid: 'B11223088', grade: 'junior', course: 'required', credit: 'low'    },
+    { sid: 'B11323112', grade: 'junior', course: 'general',  credit: 'normal' },
+    { sid: 'B11424067', grade: 'fresh',  course: 'required', credit: 'low'    },
+  ];
+  demos.forEach(d => {
+    appCounter++;
+    const { level, score } = classifyUrgency(d.grade, d.course, d.credit);
+    const app = { ...d, id: 'APP-' + String(appCounter).padStart(4,'0'),
+      level, score, status: 'waiting', submittedAt: Date.now() };
+    pqEnqueue(app);
+    levelCount[level]++;
+  });
+  renderQueue();
+  updateStats();
+  updateQuotaBar();
+})();
+</script>
+</body>
+</html>

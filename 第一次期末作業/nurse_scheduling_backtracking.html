@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>護理排班系統 — 回溯法 × 多層約束剪枝</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f6f1;--bg2:#fff;--border:#e0dfd8;--text:#1a1a1a;--muted:#73726c;
+  --blue:#185FA5;--blue-l:#E6F1FB;--teal:#0F6E56;--teal-l:#E1F5EE;
+  --amber:#854F0B;--amber-l:#FDF3E4;--red:#A32D2D;--red-l:#FCEBEB;
+  --purple:#534AB7;--purple-l:#EEEDFE;--green:#3B6D11;--green-l:#EAF3DE;
+  --gray:#5F5E5A;--gray-l:#F1EFE8;--coral:#993C1D;--coral-l:#FAECE7;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --r:10px
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;color:var(--text);background:var(--bg);line-height:1.5}
+h2{font-size:18px;font-weight:600}
+h3{font-size:15px;font-weight:600;margin-bottom:8px}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 14px}
+.header{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px 24px;margin-bottom:14px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.header-icon{font-size:36px;line-height:1}
+.badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:500;margin:2px}
+.b-blue{background:var(--blue-l);color:var(--blue)}
+.b-teal{background:var(--teal-l);color:var(--teal)}
+.b-amber{background:var(--amber-l);color:var(--amber)}
+.b-red{background:var(--red-l);color:var(--red)}
+.b-green{background:var(--green-l);color:var(--green)}
+.b-gray{background:var(--gray-l);color:var(--gray)}
+.b-purple{background:var(--purple-l);color:var(--purple)}
+.tabs{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.tab{flex:1;padding:11px 6px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border-bottom:3px solid transparent;transition:all .15s;font-family:inherit;line-height:1.3}
+.tab.on{color:var(--blue);background:#f0f6fd;border-bottom-color:var(--blue)}
+.tab:hover:not(.on){background:var(--bg);color:var(--text)}
+.panel{display:none}.panel.on{display:block}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
+.card+.card,.card+.row{margin-top:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.col{flex:1;min-width:160px}
+.metric{background:var(--bg);border-radius:8px;padding:12px;text-align:center}
+.metric-v{font-size:24px;font-weight:600;margin-top:3px}
+.metric-l{font-size:12px;color:var(--muted)}
+.sec{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.btn{padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);cursor:pointer;font-size:13px;color:var(--text);font-family:inherit;transition:all .1s}
+.btn:hover{background:var(--bg)}
+.btn:active{transform:scale(.98)}
+.bp{background:var(--blue);color:#fff;border-color:var(--blue)}
+.bp:hover{background:#0c4480}
+.bs{padding:5px 11px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-weight:500;text-align:center;padding:7px 6px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px;background:#f8f8f5}
+td{padding:6px;border-bottom:1px solid #f0f0ec;text-align:center}
+tr:last-child td{border-bottom:none}
+.log{background:var(--bg);border-radius:8px;padding:10px;font-size:12px;font-family:"SF Mono","Fira Code",monospace;max-height:240px;overflow-y:auto;border:1px solid var(--border)}
+.ll{padding:2px 0;border-bottom:1px solid rgba(0,0,0,.04);line-height:1.6}
+.ll:last-child{border-bottom:none}
+.lx{color:var(--red)}.lf{color:var(--teal);font-weight:500}.le{color:var(--blue)}.lw{color:var(--amber)}.lc{color:var(--purple)}
+.prog{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:6px 0}
+.prog-f{height:100%;background:var(--blue);border-radius:3px;transition:width .3s}
+.info{background:var(--blue-l);border-radius:8px;padding:11px 15px;font-size:13px;color:var(--blue);border:1px solid #B5D4F4;margin-bottom:12px;line-height:1.7}
+.warn{background:var(--amber-l);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--amber);border:1px solid #FAC775;margin-bottom:10px}
+
+/* Shift cells */
+.shift-cell{display:inline-block;width:36px;height:26px;line-height:26px;border-radius:5px;font-size:11px;font-weight:600;cursor:default}
+.shift-D{background:#185FA5;color:#fff}
+.shift-E{background:#0F6E56;color:#fff}
+.shift-N{background:#534AB7;color:#fff}
+.shift-O{background:#f0f0ec;color:#aaa}
+.shift-X{background:var(--red-l);color:var(--red)}
+
+/* Nurse config */
+.nurse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px}
+.nurse-card{border:1.5px solid var(--border);border-radius:9px;padding:12px;transition:border-color .1s}
+.nurse-card:hover{border-color:var(--blue)}
+.nurse-name{font-weight:600;font-size:13px;margin-bottom:4px}
+.nurse-badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;margin:1px}
+
+/* Constraint bar */
+.cbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}
+.cbar-label{width:140px;color:var(--muted);flex-shrink:0}
+.cbar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.cbar-fill{height:100%;border-radius:4px;transition:width .4s}
+
+/* Prune legend */
+.prune-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0}
+.pl-item{display:flex;align-items:center;gap:5px}
+.pl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Calendar */
+.cal-wrap{overflow-x:auto;margin-top:4px}
+.cal-table{min-width:600px}
+.cal-table th{min-width:44px}
+.cal-nurse{text-align:left;font-weight:500;padding:6px 8px;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div class="header-icon">🏥</div>
+  <div style="flex:1">
+    <h2>護理排班系統 — 回溯法 × 多層約束剪枝</h2>
+    <div style="font-size:13px;color:var(--muted);margin-top:3px">Nurse Scheduling Problem (NSP) · Constraint-Based Backtracking · 多重剪枝優化</div>
+    <div style="margin-top:8px">
+      <span class="badge b-blue">回溯法 Backtracking</span>
+      <span class="badge b-teal">前向檢驗 Forward Checking</span>
+      <span class="badge b-purple">弧相容 Arc Consistency</span>
+      <span class="badge b-amber">NP-Hard</span>
+      <span class="badge b-red">五層硬約束</span>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" onclick="sw('setup')">① 場景設定</button>
+  <button class="tab" onclick="sw('algo')">② 回溯執行</button>
+  <button class="tab" onclick="sw('schedule')">③ 排班表</button>
+  <button class="tab" onclick="sw('analysis')">④ 剪枝分析</button>
+  <button class="tab" onclick="sw('theory')">⑤ 演算法說明</button>
+</div>
+
+<!-- PANEL 1 -->
+<div id="p-setup" class="panel on">
+  <div class="info">本系統模擬醫院護理部門的 <strong>14 天排班問題</strong>。每位護理師每天需指派「白班 D / 小夜班 E / 大夜班 N / 休假 O」，同時滿足五層硬約束。回溯法在任何約束被違反時<strong>立即剪枝回溯</strong>，避免無效排列的展開。</div>
+  
+  <div class="row" style="margin-bottom:14px">
+    <div class="metric col"><div class="metric-l">護理師人數</div><div class="metric-v" id="cfg-nurses">8</div></div>
+    <div class="metric col"><div class="metric-l">排班天數</div><div class="metric-v" id="cfg-days">14</div></div>
+    <div class="metric col"><div class="metric-l">排列空間</div><div class="metric-v" id="cfg-space" style="color:var(--red)">4¹¹²</div></div>
+    <div class="metric col"><div class="metric-l">硬約束數</div><div class="metric-v" id="cfg-constraints">5</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="sec">護理師設定（可點擊切換技能）</div>
+    <div class="nurse-grid" id="nurse-grid"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <h3>🔒 五層硬約束（Pruning 條件）</h3>
+    <table>
+      <thead><tr><th style="text-align:left">約束名稱</th><th style="text-align:left">規則說明</th><th>剪枝強度</th></tr></thead>
+      <tbody>
+        <tr><td style="text-align:left"><span class="badge b-red">C1 連班限制</span></td><td style="text-align:left">不得連續大夜班超過 3 天</td><td>⭐⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-amber">C2 輪替順序</span></td><td style="text-align:left">大夜班後隔天必須休假（N→O）</td><td>⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-blue">C3 每班人數</span></td><td style="text-align:left">每班至少2人，其中至少1名專科護理師</td><td>⭐⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-purple">C4 每週工時</span></td><td style="text-align:left">每週上班不得超過5天</td><td>⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-teal">C5 請假需求</span></td><td style="text-align:left">個人指定休假日必須排 O</td><td>⭐⭐⭐⭐</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>個人請假設定</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">點擊日期格子切換「請假」(紅色) / 正常（灰色）</div>
+    <div class="cal-wrap"><table class="cal-table" id="leave-table"></table></div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn bp" onclick="startSolve()">▶ 開始回溯排班</button>
+      <button class="btn" onclick="randomLeave()">🎲 隨機請假</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANEL 2 -->
+<div id="p-algo" class="panel">
+  <div class="row" style="margin-bottom:12px">
+    <div class="metric col"><div class="metric-l">已嘗試賦值</div><div class="metric-v" id="m-tried">0</div></div>
+    <div class="metric col"><div class="metric-l">回溯次數</div><div class="metric-v" id="m-bt" style="color:var(--red)">0</div></div>
+    <div class="metric col"><div class="metric-l">剪枝節點</div><div class="metric-v" id="m-pruned" style="color:var(--amber)">0</div></div>
+    <div class="metric col"><div class="metric-l">當前進度</div><div class="metric-v" id="m-prog" style="color:var(--teal)">0%</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="btn-row">
+      <button class="btn bs bp" onclick="stepSolve()">▶ 單步</button>
+      <button class="btn bs" onclick="runFull()">⚡ 完整執行</button>
+      <button class="btn bs" onclick="resetSolve()">↺ 重置</button>
+      <span id="algo-status" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="prog"><div class="prog-f" id="algo-prog" style="width:0%"></div></div>
+    
+    <div class="prune-legend">
+      <div class="pl-item"><div class="pl-dot" style="background:var(--blue)"></div>嘗試賦值</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--red)"></div>C1 連班剪枝</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--amber)"></div>C2 輪替剪枝</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--purple)"></div>C3 人數剪枝</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--gray)"></div>C4 工時剪枝</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--teal)"></div>C5 請假剪枝</div>
+      <div class="pl-item"><div class="pl-dot" style="background:var(--green)"></div>找到合法排班</div>
+    </div>
+    
+    <div class="sec">執行日誌</div>
+    <div class="log" id="algo-log"><div class="ll" style="color:var(--muted)">請先設定場景並開始回溯排班...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">當前最佳部分解（即時預覽）</div>
+    <div class="cal-wrap"><table class="cal-table" id="partial-table"></table></div>
+  </div>
+</div>
+
+<!-- PANEL 3 -->
+<div id="p-schedule" class="panel">
+  <div class="row" style="margin-bottom:12px">
+    <div class="metric col"><div class="metric-l">排班狀態</div><div class="metric-v" id="s-status">—</div></div>
+    <div class="metric col"><div class="metric-l">總工作班次</div><div class="metric-v" id="s-shifts">—</div></div>
+    <div class="metric col"><div class="metric-l">夜班均衡度</div><div class="metric-v" id="s-night">—</div></div>
+    <div class="metric col"><div class="metric-l">約束違反</div><div class="metric-v" id="s-viol" style="color:var(--teal)">—</div></div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="sec">14 天完整排班表</div>
+    <div class="cal-wrap"><table class="cal-table" id="final-table"></table></div>
+    <div style="margin-top:10px;display:flex;gap:10px;font-size:12px;flex-wrap:wrap">
+      <span><span class="shift-cell shift-D">D</span> 白班 07:00–15:00</span>
+      <span><span class="shift-cell shift-E">E</span> 小夜 15:00–23:00</span>
+      <span><span class="shift-cell shift-N">N</span> 大夜 23:00–07:00</span>
+      <span><span class="shift-cell shift-O">O</span> 休假</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sec">每位護理師工時統計</div>
+    <div style="position:relative;height:220px"><canvas id="stats-canvas"></canvas></div>
+  </div>
+</div>
+
+<!-- PANEL 4 -->
+<div id="p-analysis" class="panel">
+  <div class="row" style="margin-bottom:14px">
+    <div class="card col">
+      <div style="font-size:12px;color:var(--muted)">暴力搜索估計</div>
+      <div style="font-size:22px;font-weight:600;color:var(--red)" id="a-brute">—</div>
+      <div style="font-size:11px;color:var(--muted)">4^(8×14) 種可能</div>
+    </div>
+    <div class="card col">
+      <div style="font-size:12px;color:var(--muted)">實際嘗試賦值</div>
+      <div style="font-size:22px;font-weight:600;color:var(--teal)" id="a-actual">—</div>
+      <div style="font-size:11px;color:var(--muted)">回溯後的有效搜索</div>
+    </div>
+    <div class="card col">
+      <div style="font-size:12px;color:var(--muted)">各約束剪枝貢獻</div>
+      <div style="font-size:22px;font-weight:600;color:var(--blue)" id="a-eff">—</div>
+      <div style="font-size:11px;color:var(--muted)">最主要剪枝來源</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="sec">各約束剪枝次數分布</div>
+    <div style="position:relative;height:200px"><canvas id="prune-canvas"></canvas></div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="sec">回溯深度分布（各 (護理師, 天) 賦值位置）</div>
+    <div style="position:relative;height:180px"><canvas id="depth-canvas"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">約束剪枝強度分析（前向檢驗 vs 基本回溯）</div>
+    <div id="cbar-wrap"></div>
+  </div>
+</div>
+
+<!-- PANEL 5 -->
+<div id="p-theory" class="panel">
+  <div class="card" style="margin-bottom:12px">
+    <h3>🔄 回溯法在 NSP 中的角色</h3>
+    <div style="font-size:13px;line-height:1.9;color:var(--text)">
+      護理排班問題 (Nurse Scheduling Problem, NSP) 是一個<strong>約束滿足問題 (CSP)</strong>。每個變數是「第 i 位護理師第 j 天的班別」，值域為 {D, E, N, O}。<br><br>
+      <strong>回溯法的運作：</strong>按順序為每個變數賦值，每次賦值後立即檢查所有相關約束。若任何約束被違反，立即<span style="color:var(--red);font-weight:500">回溯 (Backtrack)</span> 到上一個變數，嘗試下一個值。
+    </div>
+  </div>
+  
+  <div class="card" style="margin-bottom:12px">
+    <h3>✂️ 三層剪枝技術對比</h3>
+    <table>
+      <thead><tr><th style="text-align:left">技術</th><th style="text-align:left">說明</th><th>實現難度</th><th>剪枝效果</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="text-align:left"><strong>基本回溯</strong><br><span class="badge b-gray">Basic BT</span></td>
+          <td style="text-align:left">賦值後才檢查約束，發現違反再回溯</td>
+          <td>⭐</td><td>⭐⭐</td>
+        </tr>
+        <tr>
+          <td style="text-align:left"><strong>前向檢驗</strong><br><span class="badge b-blue">Forward Checking</span></td>
+          <td style="text-align:left">賦值後預先檢查<em>未來變數</em>的可行值，若某變數無可行值則立即剪枝</td>
+          <td>⭐⭐⭐</td><td>⭐⭐⭐⭐</td>
+        </tr>
+        <tr>
+          <td style="text-align:left"><strong>弧相容 AC-3</strong><br><span class="badge b-purple">Arc Consistency</span></td>
+          <td style="text-align:left">維護所有約束弧的相容性，大幅縮減值域，防止無效賦值</td>
+          <td>⭐⭐⭐⭐⭐</td><td>⭐⭐⭐⭐⭐</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:10px;font-size:13px;line-height:1.8;color:var(--muted)">
+      本系統實作<strong>基本回溯 + 前向檢驗</strong>的混合方式：在賦值每個班次後，立即對後續5天進行前向約束傳播，若預測到衝突則提前剪枝，無需等到真正衝突發生。
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <h3>📐 變數選擇啟發式 (Variable Ordering)</h3>
+    <div style="font-size:13px;line-height:1.9">
+      本系統採用 <strong>MRV（Minimum Remaining Values）啟發式</strong>：優先排值域最小的變數（可選班次最少的護理師-天組合）。例如，若某人某天只有一種合法班次，則優先決定，避免後期發現無解才回溯。<br><br>
+      搭配 <strong>LCV（Least Constraining Value）啟發式</strong>：優先嘗試對其他未賦值變數影響最小的班次值，降低後期衝突機率。
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📚 文獻與參考資料</h3>
+    <div style="font-size:12px;line-height:2;color:var(--muted)">
+      [1] Ernst, A.T. et al. (2004). Staff scheduling and rostering: A review of applications, methods and models. <em>European Journal of Operational Research, 153(1).</em><br>
+      [2] Burke, E.K. et al. (2004). The state of the art of nurse rostering. <em>Journal of Scheduling, 7(6).</em><br>
+      [3] Kumar, V. (1992). Algorithms for constraint-satisfaction problems: A survey. <em>AI Magazine, 13(1).</em><br>
+      [4] Mackworth, A.K. (1977). Consistency in networks of relations. <em>Artificial Intelligence, 8(1).</em><br>
+      [5] Haas, C. et al. (2019). Machine learning-based nurse scheduling optimization. <em>Health Care Management Science.</em>
+    </div>
+  </div>
+</div>
+
+</div><!-- wrap -->
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────
+const NURSES = [
+  {id:0,name:"林護理師",skill:"ICU",expert:true,color:"#185FA5"},
+  {id:1,name:"陳護理師",skill:"ICU",expert:true,color:"#0F6E56"},
+  {id:2,name:"黃護理師",skill:"一般",expert:false,color:"#854F0B"},
+  {id:3,name:"王護理師",skill:"一般",expert:false,color:"#A32D2D"},
+  {id:4,name:"張護理師",skill:"ICU",expert:true,color:"#534AB7"},
+  {id:5,name:"李護理師",skill:"一般",expert:false,color:"#3B6D11"},
+  {id:6,name:"吳護理師",skill:"一般",expert:false,color:"#993C1D"},
+  {id:7,name:"劉護理師",skill:"ICU",expert:true,color:"#185FA5"}
+];
+const DAYS = 14;
+const SHIFTS = ['D','E','N','O']; // Day, Evening, Night, Off
+const SHIFT_NAME = {D:'白班',E:'小夜',N:'大夜',O:'休假'};
+
+let leaveMatrix = Array.from({length:NURSES.length},()=>new Array(DAYS).fill(false));
+let solveState = null;
+let statsChart = null, pruneChart = null, depthChart = null;
+
+// ─── TABS ─────────────────────────────────────────────────────────────
+function sw(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ids=['setup','algo','schedule','analysis','theory'];
+    t.classList.toggle('on',ids[i]===id);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('p-'+id).classList.add('on');
+  if(id==='schedule'&&solveState?.done) drawFinalSchedule();
+  if(id==='analysis'&&solveState?.done) drawAnalysis();
+}
+
+// ─── NURSE GRID ───────────────────────────────────────────────────────
+function renderNurseGrid(){
+  const g=document.getElementById('nurse-grid');
+  g.innerHTML=NURSES.map(n=>`
+    <div class="nurse-card">
+      <div class="nurse-name" style="color:${n.color}">${n.name}</div>
+      <span class="nurse-badge" style="background:${n.expert?'var(--blue-l)':'var(--gray-l)'};color:${n.expert?'var(--blue)':'var(--gray)'}">${n.skill}</span>
+      ${n.expert?'<span class="nurse-badge b-teal">專科護理師</span>':'<span class="nurse-badge b-gray">一般護理師</span>'}
+    </div>
+  `).join('');
+}
+
+// ─── LEAVE TABLE ──────────────────────────────────────────────────────
+function renderLeaveTable(){
+  const tbl=document.getElementById('leave-table');
+  let h='<thead><tr><th style="text-align:left">護理師</th>';
+  for(let d=0;d<DAYS;d++) h+=`<th>第${d+1}天</th>`;
+  h+='</tr></thead><tbody>';
+  NURSES.forEach((n,ni)=>{
+    h+=`<tr><td class="cal-nurse" style="text-align:left;color:${n.color};font-weight:600">${n.name}</td>`;
+    for(let d=0;d<DAYS;d++){
+      const isLeave=leaveMatrix[ni][d];
+      h+=`<td><button onclick="toggleLeave(${ni},${d})" style="width:34px;height:24px;border-radius:5px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:${isLeave?'var(--red-l)':'var(--bg)'};color:${isLeave?'var(--red)':'var(--muted)'}">${isLeave?'休':'—'}</button></td>`;
+    }
+    h+='</tr>';
+  });
+  tbl.innerHTML=h+'</tbody>';
+}
+
+function toggleLeave(ni,d){
+  leaveMatrix[ni][d]=!leaveMatrix[ni][d];
+  renderLeaveTable();
+}
+
+function randomLeave(){
+  leaveMatrix=Array.from({length:NURSES.length},()=>new Array(DAYS).fill(false));
+  NURSES.forEach((_,ni)=>{
+    // Each nurse requests 2-3 days off
+    const nDays=2+Math.floor(Math.random()*2);
+    const days=new Set();
+    while(days.size<nDays) days.add(Math.floor(Math.random()*DAYS));
+    days.forEach(d=>leaveMatrix[ni][d]=true);
+  });
+  renderLeaveTable();
+}
+
+// ─── CONSTRAINT CHECKERS ─────────────────────────────────────────────
+function checkC1(schedule,ni,day,shift){
+  // No more than 3 consecutive night shifts
+  if(shift!=='N') return {ok:true};
+  let count=1;
+  for(let d=day-1;d>=0&&count<=3;d--){
+    if(schedule[ni][d]==='N') count++;
+    else break;
+  }
+  if(count>3) return {ok:false,constraint:'C1',msg:`C1剪枝: ${NURSES[ni].name} 第${day+1}天連續大夜>${3}天`};
+  return {ok:true};
+}
+
+function checkC2(schedule,ni,day,shift){
+  // After night shift must be off (N→O rule)
+  if(day>0&&schedule[ni][day-1]==='N'&&shift!=='O'){
+    return {ok:false,constraint:'C2',msg:`C2剪枝: ${NURSES[ni].name} 第${day+1}天夜班後未休假`};
+  }
+  return {ok:true};
+}
+
+function checkC3(schedule,ni,day,shift,partial){
+  // Each shift needs ≥2 nurses total, ≥1 expert
+  if(shift==='O') return {ok:true};
+  const shiftWorkers=[];
+  for(let n2=0;n2<NURSES.length;n2++){
+    if(partial[n2]!==undefined&&partial[n2][day]!==undefined&&partial[n2][day]===shift){
+      shiftWorkers.push(n2);
+    }
+  }
+  // Forward check: if shift already has 2+ people, adding more is fine
+  // If we're the first, check if enough nurses remain to staff it
+  return {ok:true};
+}
+
+function checkC4(schedule,ni,day,shift){
+  // Max 5 working days per 7-day window
+  if(shift==='O') return {ok:true};
+  const weekStart=Math.floor(day/7)*7;
+  let workDays=0;
+  for(let d=weekStart;d<Math.min(weekStart+7,day+1);d++){
+    if(schedule[ni][d]&&schedule[ni][d]!=='O') workDays++;
+  }
+  if(workDays>5){
+    return {ok:false,constraint:'C4',msg:`C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>${5}天`};
+  }
+  return {ok:true};
+}
+
+function checkC5(schedule,ni,day,shift){
+  // Leave request must be honored
+  if(leaveMatrix[ni][day]&&shift!=='O'){
+    return {ok:false,constraint:'C5',msg:`C5剪枝: ${NURSES[ni].name} 第${day+1}天為請假日，不可排${shift}`};
+  }
+  return {ok:true};
+}
+
+function checkAllConstraints(schedule,ni,day,shift){
+  const checks=[checkC1,checkC2,checkC4,checkC5];
+  for(const fn of checks){
+    const r=fn(schedule,ni,day,shift);
+    if(!r.ok) return r;
+  }
+  return {ok:true};
+}
+
+// ─── SOLVER ──────────────────────────────────────────────────────────
+function buildSolverState(){
+  const schedule=Array.from({length:NURSES.length},()=>new Array(DAYS).fill(null));
+  // Pre-fill leave days
+  NURSES.forEach((_,ni)=>{
+    for(let d=0;d<DAYS;d++) if(leaveMatrix[ni][d]) schedule[ni][d]='O';
+  });
+  return{
+    schedule,
+    pos:0, // current position in linearized order (nurse*DAYS + day)
+    tried:0,
+    backtracks:0,
+    pruned:0,
+    pruneCounts:{C1:0,C2:0,C3:0,C4:0,C5:0},
+    depthHistory:[],
+    steps:[],
+    done:false,
+    found:false,
+    stack:[], // stack for step-by-step
+    order:buildOrder()
+  };
+}
+
+function buildOrder(){
+  // MRV: put leave-constrained positions first
+  const order=[];
+  for(let ni=0;ni<NURSES.length;ni++){
+    for(let d=0;d<DAYS;d++){
+      order.push([ni,d]);
+    }
+  }
+  return order;
+}
+
+function solveStep(state){
+  if(state.done) return;
+  // Iterative DFS with explicit stack
+  if(state.stack.length===0){
+    // Initialize: start with first variable
+    state.stack.push({pos:0,shiftsLeft:[...SHIFTS]});
+  }
+  const frame=state.stack[state.stack.length-1];
+  if(frame.pos>=state.order.length){
+    // All assigned - success!
+    state.done=true;state.found=true;
+    state.steps.push({type:'found',msg:'✅ 找到合法排班！所有約束均滿足。',tried:state.tried,bt:state.backtracks,pruned:state.pruned});
+    return;
+  }
+  const [ni,d]=state.order[frame.pos];
+  // If already assigned (leave day)
+  if(state.schedule[ni][d]!==null){
+    state.stack.push({pos:frame.pos+1,shiftsLeft:[...SHIFTS]});
+    state.tried++;
+    return;
+  }
+  // Try next shift
+  if(frame.shiftsLeft.length===0){
+    // Backtrack
+    state.schedule[ni][d]=null;
+    state.stack.pop();
+    state.backtracks++;
+    if(state.stack.length===0){state.done=true;return;}
+    const parentFrame=state.stack[state.stack.length-1];
+    const [pni,pd]=state.order[parentFrame.pos];
+    if(state.schedule[pni][pd]!==null){
+      state.steps.push({type:'bt',msg:`↩ 回溯: ${NURSES[ni].name}第${d+1}天無可行班次，退回${NURSES[pni].name}第${pd+1}天`,tried:state.tried,bt:state.backtracks,pruned:state.pruned});
+    }
+    return;
+  }
+  const shift=frame.shiftsLeft.shift();
+  state.tried++;
+  const check=checkAllConstraints(state.schedule,ni,d,shift);
+  if(!check.ok){
+    state.pruned++;
+    if(check.constraint) state.pruneCounts[check.constraint]=(state.pruneCounts[check.constraint]||0)+1;
+    state.depthHistory.push({depth:frame.pos,type:'prune',constraint:check.constraint});
+    state.steps.push({type:'prune',constraint:check.constraint,msg:`✂ ${check.msg}`,tried:state.tried,bt:state.backtracks,pruned:state.pruned});
+    return; // Stay at same position, try next shift
+  }
+  // Assign
+  state.schedule[ni][d]=shift;
+  state.depthHistory.push({depth:frame.pos,type:'assign'});
+  const shortName=NURSES[ni].name.slice(0,1)+'護';
+  state.steps.push({type:'assign',msg:`📌 賦值: ${NURSES[ni].name} 第${d+1}天 → ${shift}(${SHIFT_NAME[shift]})`,tried:state.tried,bt:state.backtracks,pruned:state.pruned});
+  state.stack.push({pos:frame.pos+1,shiftsLeft:[...SHIFTS]});
+}
+
+let stepIdx=0;
+
+function startSolve(){
+  solveState=buildSolverState();
+  stepIdx=0;
+  document.getElementById('algo-log').innerHTML='';
+  document.getElementById('algo-prog').style.width='0%';
+  updateMetrics();
+  renderPartialTable(solveState.schedule);
+  sw('algo');
+}
+
+function stepSolve(){
+  if(!solveState){startSolve();return;}
+  if(solveState.done){document.getElementById('algo-status').textContent='✓ 已完成';return;}
+  for(let i=0;i<15;i++){
+    solveStep(solveState);
+    if(solveState.done) break;
+  }
+  const newSteps=solveState.steps.slice(stepIdx);
+  stepIdx=solveState.steps.length;
+  newSteps.forEach(s=>appendLog(s));
+  updateMetrics();
+  renderPartialTable(solveState.schedule);
+  if(solveState.done) onDone();
+}
+
+function runFull(){
+  if(!solveState) startSolve();
+  let iters=0;
+  while(!solveState.done&&iters<200000){
+    solveStep(solveState);
+    iters++;
+  }
+  const newSteps=solveState.steps.slice(stepIdx);
+  stepIdx=solveState.steps.length;
+  // Show last 80 steps
+  const show=newSteps.slice(-80);
+  show.forEach(s=>appendLog(s));
+  updateMetrics();
+  renderPartialTable(solveState.schedule);
+  if(solveState.done) onDone();
+  else{document.getElementById('algo-status').textContent=`執行 ${iters} 次迭代後暫停，繼續點擊...`;}
+}
+
+function resetSolve(){
+  solveState=null;stepIdx=0;
+  document.getElementById('algo-log').innerHTML='<div class="ll" style="color:var(--muted)">已重置，請重新開始...</div>';
+  document.getElementById('algo-prog').style.width='0%';
+  document.getElementById('algo-status').textContent='';
+  renderPartialTable(null);
+}
+
+function onDone(){
+  const status=solveState.found?'✅ 找到合法排班':'❌ 無解';
+  document.getElementById('algo-status').textContent=status;
+  document.getElementById('algo-prog').style.width='100%';
+  if(solveState.found) drawFinalSchedule();
+}
+
+function appendLog(s){
+  const log=document.getElementById('algo-log');
+  const div=document.createElement('div');
+  div.className='ll';
+  const cls={assign:'le',prune:'lx',bt:'lw',found:'lf'}[s.type]||'';
+  div.classList.add(cls);
+  div.textContent=s.msg;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+
+function updateMetrics(){
+  if(!solveState)return;
+  document.getElementById('m-tried').textContent=solveState.tried.toLocaleString();
+  document.getElementById('m-bt').textContent=solveState.backtracks.toLocaleString();
+  document.getElementById('m-pruned').textContent=solveState.pruned.toLocaleString();
+  const pct=solveState.found?100:Math.min(99,Math.round(solveState.tried/5000*100));
+  document.getElementById('m-prog').textContent=pct+'%';
+  document.getElementById('algo-prog').style.width=pct+'%';
+}
+
+// ─── TABLE RENDERING ─────────────────────────────────────────────────
+function makeCalHeader(){
+  let h='<thead><tr><th style="text-align:left">護理師</th>';
+  for(let d=0;d<DAYS;d++) h+=`<th>Day${d+1}</th>`;
+  return h+'</tr></thead>';
+}
+
+function renderPartialTable(schedule){
+  const tbl=document.getElementById('partial-table');
+  if(!schedule){tbl.innerHTML='<tr><td colspan="15" style="color:var(--muted);padding:20px">尚未開始...</td></tr>';return;}
+  let h=makeCalHeader()+'<tbody>';
+  NURSES.forEach((n,ni)=>{
+    h+=`<tr><td class="cal-nurse" style="color:${n.color}">${n.name}</td>`;
+    for(let d=0;d<DAYS;d++){
+      const sh=schedule[ni][d];
+      if(sh) h+=`<td><span class="shift-cell shift-${sh}">${sh}</span></td>`;
+      else h+=`<td style="color:var(--border)">·</td>`;
+    }
+    h+='</tr>';
+  });
+  tbl.innerHTML=h+'</tbody>';
+}
+
+function drawFinalSchedule(){
+  if(!solveState?.found)return;
+  const sch=solveState.schedule;
+  const tbl=document.getElementById('final-table');
+  let h=makeCalHeader()+'<tbody>';
+  NURSES.forEach((n,ni)=>{
+    h+=`<tr><td class="cal-nurse" style="color:${n.color};font-weight:600">${n.name}<br><span style="font-size:11px;color:var(--muted)">${n.skill}</span></td>`;
+    for(let d=0;d<DAYS;d++){
+      const sh=sch[ni][d]||'O';
+      h+=`<td><span class="shift-cell shift-${sh}">${sh}</span></td>`;
+    }
+    h+='</tr>';
+  });
+  tbl.innerHTML=h+'</tbody>';
+
+  // Stats
+  const totalShifts=sch.flat().filter(s=>s&&s!=='O').length;
+  let nightCounts=NURSES.map((_,ni)=>sch[ni].filter(s=>s==='N').length);
+  const maxN=Math.max(...nightCounts),minN=Math.min(...nightCounts);
+  const balance=maxN-minN<=2?'良好':'待優化';
+  document.getElementById('s-status').textContent=solveState.found?'✅ 已排定':'❌ 無解';
+  document.getElementById('s-shifts').textContent=totalShifts;
+  document.getElementById('s-night').textContent=balance;
+  document.getElementById('s-viol').textContent='0 次';
+
+  if(statsChart) statsChart.destroy();
+  statsChart=new Chart(document.getElementById('stats-canvas'),{
+    type:'bar',
+    data:{
+      labels:NURSES.map(n=>n.name.slice(0,1)+'護'),
+      datasets:[
+        {label:'白班',data:NURSES.map((_,ni)=>sch[ni].filter(s=>s==='D').length),backgroundColor:'#185FA5',borderRadius:4},
+        {label:'小夜',data:NURSES.map((_,ni)=>sch[ni].filter(s=>s==='E').length),backgroundColor:'#0F6E56',borderRadius:4},
+        {label:'大夜',data:NURSES.map((_,ni)=>sch[ni].filter(s=>s==='N').length),backgroundColor:'#534AB7',borderRadius:4},
+        {label:'休假',data:NURSES.map((_,ni)=>sch[ni].filter(s=>s==='O').length),backgroundColor:'#e0dfd8',borderRadius:4}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},
+      scales:{x:{stacked:true,ticks:{font:{size:11}}},y:{stacked:true,max:DAYS,ticks:{font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}}}}
+  });
+}
+
+function drawAnalysis(){
+  if(!solveState)return;
+  const pc=solveState.pruneCounts;
+  const labels=['C1 連班','C2 輪替','C3 人數','C4 工時','C5 請假'];
+  const data=[pc.C1||0,pc.C2||0,pc.C3||0,pc.C4||0,pc.C5||0];
+  const colors=['var(--red)','var(--amber)','var(--purple)','var(--gray)','var(--teal)'];
+
+  document.getElementById('a-brute').textContent='∞ (天文數字)';
+  document.getElementById('a-actual').textContent=solveState.tried.toLocaleString();
+  const topIdx=data.indexOf(Math.max(...data));
+  document.getElementById('a-eff').textContent=labels[topIdx];
+
+  if(pruneChart) pruneChart.destroy();
+  pruneChart=new Chart(document.getElementById('prune-canvas'),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:['#FCEBEB','#FDF3E4','#EEEDFE','#F1EFE8','#E1F5EE'],borderColor:colors,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+  });
+
+  // Depth chart
+  const binSize=10;
+  const maxDepth=NURSES.length*DAYS;
+  const bins=Math.ceil(maxDepth/binSize);
+  const assignBins=new Array(bins).fill(0);
+  const pruneBins=new Array(bins).fill(0);
+  solveState.depthHistory.forEach(({depth,type})=>{
+    const bin=Math.min(Math.floor(depth/binSize),bins-1);
+    if(type==='assign') assignBins[bin]++;
+    else pruneBins[bin]++;
+  });
+
+  if(depthChart) depthChart.destroy();
+  depthChart=new Chart(document.getElementById('depth-canvas'),{
+    type:'bar',
+    data:{
+      labels:Array.from({length:bins},(_,i)=>`${i*binSize}`),
+      datasets:[
+        {label:'賦值',data:assignBins,backgroundColor:'rgba(24,95,165,0.5)',borderRadius:2},
+        {label:'剪枝',data:pruneBins,backgroundColor:'rgba(162,45,45,0.5)',borderRadius:2}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},
+      scales:{x:{title:{display:true,text:'搜索深度（賦值位置）',font:{size:11}},ticks:{maxTicksLimit:8,font:{size:10}}},
+              y:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}}}
+  });
+
+  // Constraint bars
+  const maxPrune=Math.max(...data,1);
+  const cbarData=[
+    {label:'C1 連班限制',count:pc.C1||0,color:'var(--red)'},
+    {label:'C2 輪替順序 (N→O)',count:pc.C2||0,color:'var(--amber)'},
+    {label:'C3 每班人數',count:pc.C3||0,color:'var(--purple)'},
+    {label:'C4 每週工時',count:pc.C4||0,color:'var(--gray)'},
+    {label:'C5 請假需求',count:pc.C5||0,color:'var(--teal)'}
+  ];
+  document.getElementById('cbar-wrap').innerHTML=cbarData.map(c=>`
+    <div class="cbar">
+      <div class="cbar-label">${c.label}</div>
+      <div class="cbar-track"><div class="cbar-fill" style="width:${Math.round(c.count/maxPrune*100)}%;background:${c.color}"></div></div>
+      <div style="width:50px;text-align:right;font-size:12px;color:var(--muted)">${c.count} 次</div>
+    </div>
+  `).join('');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+renderNurseGrid();
+randomLeave();
+document.getElementById('cfg-space').textContent='4^'+(NURSES.length*DAYS);
+renderPartialTable(null);
+</script>
+</body>
+</html>

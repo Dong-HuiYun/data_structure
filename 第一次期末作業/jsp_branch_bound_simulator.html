@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>車間排程問題 (JSP) — 分支定界法回溯模擬器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;color:#1a1a1a;background:#f5f5f0;line-height:1.5;min-height:100vh}
+.app-container{max-width:900px;margin:0 auto;padding:24px 16px}
+.app-header{background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:20px 24px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.app-title{font-size:20px;font-weight:600;color:#1a1a1a}
+.app-subtitle{font-size:13px;color:#73726c;margin-top:3px}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:500;margin:2px}
+.badge-blue{background:#E6F1FB;color:#185FA5}
+.badge-teal{background:#E1F5EE;color:#0F6E56}
+.badge-amber{background:#FAEEDA;color:#854F0B}
+.badge-red{background:#FCEBEB;color:#A32D2D}
+.badge-gray{background:#F1EFE8;color:#5F5E5A}
+.badge-green{background:#EAF3DE;color:#3B6D11}
+.tabs{display:flex;gap:0;background:#fff;border:1px solid #e0dfd8;border-radius:12px;overflow:hidden;margin-bottom:16px}
+.tab-btn{flex:1;padding:12px 8px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:#73726c;border-bottom:3px solid transparent;transition:all .15s;font-family:inherit}
+.tab-btn.active{color:#185FA5;background:#f0f6fd;border-bottom-color:#185FA5}
+.tab-btn:hover:not(.active){background:#f8f8f5;color:#1a1a1a}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid #e0dfd8;border-radius:12px;padding:18px}
+.card+.card,.card+div,.div+.card{margin-top:14px}
+.section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#73726c;margin-bottom:10px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.col{flex:1;min-width:140px}
+.metric{background:#f5f5f0;border-radius:8px;padding:14px;text-align:center}
+.metric-val{font-size:24px;font-weight:600;margin-top:4px}
+.metric-lbl{font-size:12px;color:#73726c}
+.btn{padding:8px 16px;border:1px solid #d0cfc8;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;color:#1a1a1a;font-family:inherit;transition:all .1s}
+.btn:hover{background:#f5f5f0}
+.btn:active{transform:scale(0.98)}
+.btn-primary{background:#185FA5;color:#fff;border-color:#185FA5}
+.btn-primary:hover{background:#0c4480}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+select,input[type=number]{padding:6px 10px;border:1px solid #d0cfc8;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit}
+label{font-size:13px;color:#73726c}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid #e0dfd8;color:#73726c;font-size:12px;background:#f8f8f5}
+td{padding:8px 10px;border-bottom:1px solid #f0f0ec}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafafa}
+.gantt-wrap{overflow-x:auto}
+.log-box{background:#f5f5f0;border-radius:8px;padding:10px;font-size:12px;font-family:"SF Mono","Fira Code",monospace;max-height:220px;overflow-y:auto;border:1px solid #e0dfd8}
+.log-line{padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.04);line-height:1.6}
+.log-line:last-child{border-bottom:none}
+.log-prune{color:#A32D2D}
+.log-found{color:#0F6E56;font-weight:500}
+.log-explore{color:#185FA5}
+.log-bound{color:#854F0B}
+.prog-bar{height:6px;background:#e0dfd8;border-radius:3px;overflow:hidden;margin:8px 0}
+.prog-fill{height:100%;border-radius:3px;background:#185FA5;transition:width .3s}
+.info-box{background:#E6F1FB;border-radius:8px;padding:12px 16px;font-size:13px;color:#185FA5;border:1px solid #B5D4F4;margin-bottom:14px;line-height:1.7}
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.preset-card{border:1.5px solid #e0dfd8;border-radius:10px;padding:12px;cursor:pointer;transition:all .15s}
+.preset-card:hover{border-color:#185FA5;background:#f0f6fd}
+.preset-card.selected{border-color:#185FA5;background:#E6F1FB}
+.preset-card h4{font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a1a}
+.preset-card p{font-size:12px;color:#73726c;line-height:1.5}
+.step-flow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.step-box{padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;text-align:center;min-width:80px;border:1px solid transparent}
+.arrow-step{color:#73726c;font-size:18px}
+.tree-container{border:1px solid #e0dfd8;border-radius:10px;background:#f8f8f5;overflow:auto;margin-top:8px;min-height:180px}
+.legend-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#73726c;margin-top:6px}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+@media(max-width:600px){.preset-grid{grid-template-columns:1fr}.tabs{flex-direction:column}.tab-btn{border-bottom:none;border-left:3px solid transparent}.tab-btn.active{border-bottom:none;border-left-color:#185FA5}}
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="app-header">
+    <div style="flex:1">
+      <div class="app-title">🏭 車間排程問題 (JSP) 分支定界法模擬器</div>
+      <div class="app-subtitle">Branch &amp; Bound with Backtracking Pruning — 互動式視覺化教學工具</div>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap">
+      <span class="badge badge-blue">Branch &amp; Bound</span>
+      <span class="badge badge-teal">Backtracking</span>
+      <span class="badge badge-amber">NP-Hard</span>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('setup')">① 問題設定</button>
+    <button class="tab-btn" onclick="switchTab('algo')">② 演算法執行</button>
+    <button class="tab-btn" onclick="switchTab('gantt')">③ 甘特圖</button>
+    <button class="tab-btn" onclick="switchTab('analysis')">④ 分析比較</button>
+    <button class="tab-btn" onclick="switchTab('theory')">⑤ 理論說明</button>
+  </div>
+
+  <!-- PANEL 1 -->
+  <div id="panel-setup" class="panel active">
+    <div class="card">
+      <div class="info-box">選擇預設工廠場景或自訂工作參數。系統將使用 <strong>分支定界法 (Branch &amp; Bound)</strong> 結合回溯剪枝求最短完工時間 (Makespan)。</div>
+      <div class="section-title">選擇場景</div>
+      <div class="preset-grid">
+        <div class="preset-card selected" id="preset-0" onclick="selectPreset(0)">
+          <h4>🔬 半導體晶圓廠</h4>
+          <p>3 工作 · 3 機器<br>教學用小規模場景</p>
+        </div>
+        <div class="preset-card" id="preset-1" onclick="selectPreset(1)">
+          <h4>⚙️ 金屬加工廠</h4>
+          <p>4 工作 · 4 機器<br>中等複雜度場景</p>
+        </div>
+        <div class="preset-card" id="preset-2" onclick="selectPreset(2)">
+          <h4>🖥️ PCB 製造廠</h4>
+          <p>5 工作 · 4 機器<br>進階挑戰場景</p>
+        </div>
+      </div>
+      <div class="section-title" id="table-title">半導體晶圓廠 — 加工時間矩陣</div>
+      <div style="font-size:12px;color:#73726c;margin-bottom:8px">每格格式：<strong>機器編號 / 加工時間</strong>（工序由左至右執行）</div>
+      <div style="overflow-x:auto"><table id="job-table"></table></div>
+      <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="runAlgorithm()">▶ 執行分支定界法</button>
+        <button class="btn" onclick="switchTab('algo')">查看執行過程 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 2 -->
+  <div id="panel-algo" class="panel">
+    <div class="row" style="margin-bottom:12px">
+      <div class="metric col"><div class="metric-lbl">已探索節點</div><div class="metric-val" id="m-explored">0</div></div>
+      <div class="metric col"><div class="metric-lbl">剪枝次數</div><div class="metric-val" id="m-pruned" style="color:#A32D2D">0</div></div>
+      <div class="metric col"><div class="metric-lbl">當前最優 Makespan</div><div class="metric-val" id="m-best" style="color:#0F6E56">∞</div></div>
+      <div class="metric col"><div class="metric-lbl">節省比例</div><div class="metric-val" id="m-saving">—</div></div>
+    </div>
+    <div class="card">
+      <div class="btn-group">
+        <button class="btn btn-sm btn-primary" onclick="stepAlgo()">▶ 單步執行</button>
+        <button class="btn btn-sm" onclick="runFull()">⚡ 完整執行</button>
+        <button class="btn btn-sm" onclick="resetAlgo()">↺ 重置</button>
+        <span id="algo-status" style="font-size:12px;color:#73726c;padding:4px"></span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="algo-prog" style="width:0%"></div></div>
+      <div class="section-title" style="margin-top:12px">執行日誌</div>
+      <div class="log-box" id="algo-log"><div class="log-line" style="color:#73726c">請先在「問題設定」頁面執行演算法...</div></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="section-title">決策樹視覺化</div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#185FA5"></div>探索節點</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E24B4A"></div>剪枝節點</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div>最優解節點</div>
+      </div>
+      <div class="tree-container" id="tree-container">
+        <svg id="tree-svg" width="100%" viewBox="0 0 800 300">
+          <text x="400" y="150" text-anchor="middle" font-size="14" fill="#73726c">執行演算法後顯示決策樹</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 3 -->
+  <div id="panel-gantt" class="panel">
+    <div class="row" style="margin-bottom:12px">
+      <div class="metric col"><div class="metric-lbl">最優 Makespan</div><div class="metric-val" id="g-makespan" style="color:#0F6E56">—</div></div>
+      <div class="metric col"><div class="metric-lbl">機器平均利用率</div><div class="metric-val" id="g-util">—</div></div>
+      <div class="metric col"><div class="metric-lbl">最優工作順序</div><div class="metric-val" id="g-order" style="font-size:14px;word-break:break-all">—</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">最優排程甘特圖</div>
+      <div class="gantt-wrap"><canvas id="gantt-canvas" height="220"></canvas></div>
+      <div style="margin-top:8px;font-size:12px;color:#73726c">每格顏色代表不同工作，橫軸為時間單位，縱軸為機器</div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="section-title">排程明細</div>
+      <div style="overflow-x:auto"><table id="schedule-table"><thead><tr><th>工作</th><th>機器</th><th>開始時間</th><th>結束時間</th><th>加工時間</th><th>狀態</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- PANEL 4 -->
+  <div id="panel-analysis" class="panel">
+    <div class="row" style="margin-bottom:14px">
+      <div class="card col">
+        <div style="font-size:12px;color:#73726c;margin-bottom:4px">暴力搜索節點數 (n!)</div>
+        <div style="font-size:26px;font-weight:600;color:#A32D2D" id="a-brute">—</div>
+        <div style="font-size:11px;color:#73726c;margin-top:2px">所有可能排列</div>
+      </div>
+      <div class="card col">
+        <div style="font-size:12px;color:#73726c;margin-bottom:4px">B&amp;B 實際探索</div>
+        <div style="font-size:26px;font-weight:600;color:#0F6E56" id="a-actual">—</div>
+        <div style="font-size:11px;color:#73726c;margin-top:2px">含剪枝後的搜索</div>
+      </div>
+      <div class="card col">
+        <div style="font-size:12px;color:#73726c;margin-bottom:4px">搜索空間削減</div>
+        <div style="font-size:26px;font-weight:600;color:#185FA5" id="a-eff">—</div>
+        <div style="font-size:11px;color:#73726c;margin-top:2px">剪枝效率提升</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="section-title">搜索節點數對比</div>
+      <div style="position:relative;height:200px"><canvas id="compare-canvas"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">下界 (LB) 與上界 (UB) 收斂過程</div>
+      <div style="position:relative;height:180px"><canvas id="bound-canvas"></canvas></div>
+      <div style="font-size:12px;color:#73726c;margin-top:6px">藍線=下界估計，綠虛線=當前最優上界。當兩線接近時，演算法收斂，剪枝效果最佳。</div>
+    </div>
+  </div>
+
+  <!-- PANEL 5 -->
+  <div id="panel-theory" class="panel">
+    <div class="card" style="margin-bottom:14px">
+      <div class="section-title">演算法流程</div>
+      <div class="step-flow">
+        <div class="step-box" style="background:#E6F1FB;color:#185FA5;border-color:#B5D4F4">① 初始化<br><small>UB = ∞</small></div>
+        <div class="arrow-step">→</div>
+        <div class="step-box" style="background:#EEEDFE;color:#534AB7;border-color:#CECBF6">② 選擇節點<br><small>最小下界優先</small></div>
+        <div class="arrow-step">→</div>
+        <div class="step-box" style="background:#FAEEDA;color:#854F0B;border-color:#FAC775">③ 計算下界<br><small>LB = max(LB₁,LB₂)</small></div>
+        <div class="arrow-step">→</div>
+        <div class="step-box" style="background:#FCEBEB;color:#A32D2D;border-color:#F7C1C1">④ 剪枝判斷<br><small>LB ≥ UB → 回溯!</small></div>
+        <div class="arrow-step">→</div>
+        <div class="step-box" style="background:#E1F5EE;color:#0F6E56;border-color:#9FE1CB">⑤ 更新最優<br><small>UB = 新 Makespan</small></div>
+      </div>
+      <div style="font-size:12px;color:#73726c;margin-top:6px;line-height:1.8">
+        核心回溯機制：當某個排程分支的<strong>下界估計 LB ≥ 當前最優上界 UB</strong> 時，系統立即<span style="color:#A32D2D;font-weight:500">剪枝（回溯）</span>，放棄該分支的所有子節點，大幅縮小搜索空間。
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="section-title">下界計算公式</div>
+      <div style="font-size:13px;line-height:2;background:#f8f8f5;padding:12px;border-radius:8px;font-family:'SF Mono','Fira Code',monospace">
+        <span style="color:#185FA5">LB₁</span> = max<sub>m</sub>(機器 m 的當前佔用時間 + 剩餘工作的最小加工時間)<br>
+        <span style="color:#185FA5">LB₂</span> = max<sub>j</sub>(工作 j 的最早可能完工時間)<br>
+        <span style="color:#0F6E56;font-weight:600">LB  = max(LB₁, LB₂, 當前已排程最晚結束時間)</span>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="section-title">工廠應用場景對照</div>
+      <table>
+        <thead><tr><th>場景</th><th>工作 (Jobs)</th><th>機器</th><th>目標</th></tr></thead>
+        <tbody>
+          <tr><td>半導體晶圓廠</td><td>不同IC訂單</td><td>蝕刻/擴散/研磨機</td><td>最小化批次完工時間</td></tr>
+          <tr><td>金屬加工廠</td><td>零件加工批次</td><td>車/銑/鑽/研磨</td><td>最大化機器利用率</td></tr>
+          <tr><td>PCB 製造廠</td><td>不同板型訂單</td><td>SMT/回流焊/AOI/波峰焊</td><td>趕上客戶交期</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="section-title">文獻與參考資料</div>
+      <div style="font-size:12px;line-height:2;color:#73726c">
+        [1] Garey, M.R. &amp; Johnson, D.S. (1979). <em>Computers and Intractability: A Guide to the Theory of NP-Completeness.</em> Freeman.<br>
+        [2] Lageweg, B.J., Lenstra, J.K., &amp; Rinnooy Kan, A.H.G. (1988). Job-shop scheduling by implicit enumeration. <em>Management Science.</em><br>
+        [3] Carlier, J., &amp; Pinson, E. (1989). An algorithm for solving the job-shop problem. <em>Management Science, 35(2).</em><br>
+        [4] Pezzella, F., &amp; Merelli, E. (2000). A tabu search method guided by shifting bottleneck for the job-shop scheduling problem. <em>European Journal of Operational Research.</em><br>
+        [5] Brucker, P. (2007). <em>Scheduling Algorithms</em> (5th ed.). Springer-Verlag.<br>
+        [6] Pinedo, M.L. (2016). <em>Scheduling: Theory, Algorithms, and Systems</em> (5th ed.). Springer.
+      </div>
+    </div>
+  </div>
+
+</div><!-- end app-container -->
+
+<script>
+const PRESETS = [
+  {
+    name:"半導體晶圓廠 — 加工時間矩陣",
+    jobs:[
+      {name:"訂單A (CPU晶片)", ops:[[0,3],[1,2],[2,2]]},
+      {name:"訂單B (記憶體)", ops:[[0,2],[2,1],[1,4]]},
+      {name:"訂單C (類比IC)", ops:[[1,4],[0,3],[2,2]]}
+    ],
+    machines:["M1 蝕刻機","M2 擴散爐","M3 CMP研磨"]
+  },
+  {
+    name:"金屬加工廠 — 加工時間矩陣",
+    jobs:[
+      {name:"零件P1 (軸承)", ops:[[0,3],[1,2],[2,2],[3,1]]},
+      {name:"零件P2 (齒輪)", ops:[[0,2],[3,4],[1,1],[2,3]]},
+      {name:"零件P3 (螺桿)", ops:[[2,3],[0,2],[3,3],[1,2]]},
+      {name:"零件P4 (凸輪)", ops:[[3,2],[2,1],[0,4],[1,2]]}
+    ],
+    machines:["M1 車床","M2 銑床","M3 鑽孔機","M4 研磨機"]
+  },
+  {
+    name:"PCB製造廠 — 加工時間矩陣",
+    jobs:[
+      {name:"PCB-01 (主板)", ops:[[0,2],[1,3],[2,2],[3,1]]},
+      {name:"PCB-02 (顯卡)", ops:[[1,2],[0,3],[3,2],[2,4]]},
+      {name:"PCB-03 (網卡)", ops:[[2,1],[3,3],[0,2],[1,2]]},
+      {name:"PCB-04 (音效卡)", ops:[[0,3],[2,2],[1,1],[3,3]]},
+      {name:"PCB-05 (電源板)", ops:[[3,2],[1,2],[2,3],[0,2]]}
+    ],
+    machines:["M1 SMT貼片","M2 回流焊","M3 AOI檢測","M4 波峰焊"]
+  }
+];
+
+const JOB_COLORS = ['#185FA5','#0F6E56','#854F0B','#A32D2D','#534AB7'];
+const JOB_BG     = ['#E6F1FB','#E1F5EE','#FAEEDA','#FCEBEB','#EEEDFE'];
+
+let currentPreset = 0;
+let algoResult = null;
+let algoSteps = [];
+let stepIndex = 0;
+let bestSchedule = null;
+let compareChart = null;
+let boundChart = null;
+
+function switchTab(id){
+  ['setup','algo','gantt','analysis','theory'].forEach((t,i)=>{
+    document.querySelectorAll('.tab-btn')[i].classList.toggle('active',t===id);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  if(id==='gantt'&&bestSchedule) drawGantt();
+  if(id==='analysis'&&algoResult) drawAnalysis();
+}
+
+function selectPreset(i){
+  currentPreset=i;
+  document.querySelectorAll('.preset-card').forEach((c,j)=>c.classList.toggle('selected',j===i));
+  renderJobTable();
+  resetAlgo();
+}
+
+function renderJobTable(){
+  const p=PRESETS[currentPreset];
+  document.getElementById('table-title').textContent=p.name;
+  const tbl=document.getElementById('job-table');
+  const maxOps=Math.max(...p.jobs.map(j=>j.ops.length));
+  let html='<thead><tr><th>工作</th>';
+  for(let i=0;i<maxOps;i++) html+=`<th>工序 ${i+1}</th>`;
+  html+='</tr></thead><tbody>';
+  p.jobs.forEach((job,ji)=>{
+    html+=`<tr><td style="font-weight:500"><span style="display:inline-block;width:10px;height:10px;background:${JOB_COLORS[ji]};border-radius:3px;margin-right:6px;vertical-align:middle"></span>${job.name}</td>`;
+    job.ops.forEach(([m,t])=>{
+      html+=`<td><span class="badge badge-gray">M${m+1}</span> <strong>${t}</strong> 單位</td>`;
+    });
+    html+='</tr>';
+  });
+  tbl.innerHTML=html+'</tbody>';
+}
+
+function factorial(x){return x<=1?1:x*factorial(x-1)}
+
+function computeLB(jobs,perm,machEnd){
+  let lb=Math.max(...machEnd,0);
+  const remaining=Array.from({length:jobs.length},(_,i)=>i).filter(i=>!perm.includes(i));
+  remaining.forEach(ji=>{
+    let t=jobs[ji].ops.reduce((s,[,d])=>s+d,0);
+    lb=Math.max(lb,t);
+  });
+  machEnd.forEach((me,mi)=>{
+    let extra=0;
+    remaining.forEach(ji=>{
+      const op=jobs[ji].ops.find(([m])=>m===mi);
+      if(op) extra+=op[1];
+    });
+    lb=Math.max(lb,me+extra);
+  });
+  return lb;
+}
+
+function scheduleJobs(jobs,machines,perm){
+  const m=machines.length;
+  const machEnd=new Array(m).fill(0);
+  const events=[];
+  perm.forEach(ji=>{
+    const job=jobs[ji];
+    let cur=0;
+    job.ops.forEach(([mi,dur])=>{
+      const start=Math.max(cur,machEnd[mi]);
+      machEnd[mi]=start+dur;
+      cur=start+dur;
+      events.push({job:ji,machine:mi,start,end:start+dur,dur});
+    });
+  });
+  return{makespan:Math.max(...machEnd),machEnd:[...machEnd],events};
+}
+
+function buildAlgoSteps(preset){
+  const {jobs,machines}=preset;
+  const n=jobs.length;
+  const m=machines.length;
+  const steps=[];
+  let bestMakespan=Infinity;
+  let bestPerm=null;
+  let explored=0,pruned=0;
+  const lbHistory=[];
+
+  function dfs(perm,machEnd2){
+    explored++;
+    const remaining=Array.from({length:n},(_,i)=>i).filter(i=>!perm.includes(i));
+    const lb=computeLB(jobs,perm,machEnd2);
+    lbHistory.push({explored,lb,best:bestMakespan===Infinity?null:bestMakespan});
+
+    if(lb>=bestMakespan){
+      pruned++;
+      steps.push({type:'prune',perm:[...perm],lb,best:bestMakespan,explored,pruned});
+      return;
+    }
+    if(perm.length===n){
+      const res=scheduleJobs(jobs,machines,perm);
+      if(res.makespan<bestMakespan){
+        bestMakespan=res.makespan;
+        bestPerm=[...perm];
+        steps.push({type:'found',perm:[...perm],lb:res.makespan,best:bestMakespan,explored,pruned,makespan:res.makespan,events:res.events,machEnd:[...res.machEnd]});
+      } else {
+        steps.push({type:'leaf',perm:[...perm],lb:res.makespan,best:bestMakespan,explored,pruned,makespan:res.makespan});
+      }
+      return;
+    }
+    steps.push({type:'explore',perm:[...perm],lb,best:bestMakespan,explored,pruned});
+    remaining.forEach(ji=>{
+      const newMachEnd=[...machEnd2];
+      let cur=0;
+      jobs[ji].ops.forEach(([mi,dur])=>{
+        const s=Math.max(cur,newMachEnd[mi]);
+        newMachEnd[mi]=s+dur;
+        cur=s+dur;
+      });
+      dfs([...perm,ji],newMachEnd);
+    });
+  }
+
+  dfs([],new Array(m).fill(0));
+  const finalRes=bestPerm?scheduleJobs(jobs,machines,bestPerm):null;
+  return{steps,bestMakespan,bestPerm,finalRes,totalBrute:factorial(n),totalExplored:explored,totalPruned:pruned,lbHistory};
+}
+
+function runAlgorithm(){
+  const p=PRESETS[currentPreset];
+  algoResult=buildAlgoSteps(p);
+  algoSteps=algoResult.steps;
+  stepIndex=0;
+  bestSchedule=algoResult.finalRes;
+  document.getElementById('algo-log').innerHTML='';
+  document.getElementById('algo-prog').style.width='0%';
+  document.getElementById('m-explored').textContent='0';
+  document.getElementById('m-pruned').textContent='0';
+  document.getElementById('m-best').textContent='∞';
+  document.getElementById('m-saving').textContent='—';
+  document.getElementById('algo-status').textContent=`共 ${algoSteps.length} 步驟，點擊「單步執行」逐步查看`;
+  drawEmptyTree();
+  switchTab('algo');
+}
+
+function applyStep(s){
+  const p=PRESETS[currentPreset];
+  const jobNames=p.jobs.map(j=>j.name.split(' ')[0]);
+  const permStr=s.perm.map(i=>jobNames[i]).join(' → ');
+  let line='',cls='log-line';
+  if(s.type==='explore'){
+    line=`[探索] [${permStr||'根節點'}]  LB=${s.lb}  UB=${s.best===Infinity?'∞':s.best}`;
+    cls+=' log-explore';
+  }else if(s.type==='prune'){
+    line=`[剪枝✂] [${permStr}]  LB=${s.lb} ≥ UB=${s.best}  → 回溯放棄此分支`;
+    cls+=' log-prune';
+  }else if(s.type==='found'){
+    line=`[★最優] [${permStr}]  Makespan=${s.makespan}  → 更新最優解!`;
+    cls+=' log-found';
+  }else{
+    line=`[葉節點] [${permStr}]  Makespan=${s.makespan} ≥ 當前最優 ${s.best}`;
+    cls+=' log-bound';
+  }
+  const log=document.getElementById('algo-log');
+  const div=document.createElement('div');
+  div.className=cls;
+  div.textContent=line;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+  document.getElementById('m-explored').textContent=s.explored;
+  document.getElementById('m-pruned').textContent=s.pruned;
+  if(s.best!==Infinity) document.getElementById('m-best').textContent=s.best;
+}
+
+function stepAlgo(){
+  if(!algoSteps.length){runAlgorithm();return;}
+  if(stepIndex>=algoSteps.length){document.getElementById('algo-status').textContent='✓ 演算法已完成！';return;}
+  applyStep(algoSteps[stepIndex]);
+  stepIndex++;
+  document.getElementById('algo-prog').style.width=(stepIndex/algoSteps.length*100)+'%';
+  if(stepIndex>=algoSteps.length){
+    finishAlgo();
+  }
+}
+
+function finishAlgo(){
+  document.getElementById('algo-status').textContent=`✓ 完成！最優 Makespan = ${algoResult.bestMakespan}`;
+  const saving=Math.round(algoResult.totalPruned/algoResult.totalBrute*100);
+  document.getElementById('m-saving').textContent=saving+'%';
+  const p=PRESETS[currentPreset];
+  document.getElementById('g-makespan').textContent=algoResult.bestMakespan;
+  const totalWork=p.jobs.reduce((s,j)=>s+j.ops.reduce((a,[,t])=>a+t,0),0);
+  const util=Math.round(totalWork/(p.machines.length*algoResult.bestMakespan)*100)+'%';
+  document.getElementById('g-util').textContent=util;
+  const jobNames=p.jobs.map(j=>j.name.split(' ')[0]);
+  document.getElementById('g-order').textContent=algoResult.bestPerm.map(i=>jobNames[i]).join(' → ');
+  document.getElementById('a-brute').textContent=algoResult.totalBrute.toLocaleString();
+  document.getElementById('a-actual').textContent=algoResult.totalExplored.toLocaleString();
+  document.getElementById('a-eff').textContent=Math.round((1-algoResult.totalExplored/algoResult.totalBrute)*100)+'%';
+  drawTree();
+}
+
+function runFull(){
+  if(!algoSteps.length){runAlgorithm();}
+  algoSteps.forEach(s=>applyStep(s));
+  stepIndex=algoSteps.length;
+  document.getElementById('algo-prog').style.width='100%';
+  finishAlgo();
+}
+
+function resetAlgo(){
+  algoResult=null;algoSteps=[];stepIndex=0;bestSchedule=null;
+  document.getElementById('algo-log').innerHTML='<div class="log-line" style="color:#73726c">請先執行演算法...</div>';
+  document.getElementById('algo-prog').style.width='0%';
+  document.getElementById('m-explored').textContent='0';
+  document.getElementById('m-pruned').textContent='0';
+  document.getElementById('m-best').textContent='∞';
+  document.getElementById('m-saving').textContent='—';
+  document.getElementById('algo-status').textContent='';
+  drawEmptyTree();
+}
+
+function drawEmptyTree(){
+  document.getElementById('tree-svg').innerHTML='<text x="400" y="150" text-anchor="middle" font-size="14" fill="#73726c">執行演算法後顯示決策樹</text>';
+}
+
+function drawTree(){
+  if(!algoSteps.length)return;
+  const p=PRESETS[currentPreset];
+  const n=p.jobs.length;
+  const jobNames=p.jobs.map(j=>j.name.split(' ')[0]);
+  const nodeMap={};
+  algoSteps.forEach(s=>{
+    const key=s.perm.join(',');
+    if(!nodeMap[key]){
+      nodeMap[key]={level:s.perm.length,type:s.type,lb:s.lb,perm:[...s.perm]};
+    }
+  });
+  const byLevel={};
+  Object.entries(nodeMap).forEach(([k,v])=>{
+    if(!byLevel[v.level])byLevel[v.level]=[];
+    byLevel[v.level].push({key:k,...v});
+  });
+  const W=800;
+  const rowH=Math.min(70,240/Math.max(n,1));
+  const H=Math.max(280,(n+1)*rowH+60);
+  const pos={};
+  Object.entries(byLevel).forEach(([lv,arr])=>{
+    const y=parseInt(lv)*rowH+50;
+    const maxPerRow=Math.min(arr.length,20);
+    arr.slice(0,maxPerRow).forEach((node,i)=>{
+      const x=W/(maxPerRow+1)*(i+1);
+      pos[node.key]={x,y};
+    });
+  });
+  let html='';
+  algoSteps.forEach(s=>{
+    if(s.perm.length>0){
+      const fromKey=s.perm.slice(0,-1).join(',');
+      const toKey=s.perm.join(',');
+      const f=pos[fromKey],t=pos[toKey];
+      if(f&&t){
+        const col=s.type==='prune'?'#E24B4A':s.type==='found'?'#1D9E75':'#B4B2A9';
+        const dash=s.type==='prune'?'stroke-dasharray="5 3"':'';
+        html+=`<line x1="${f.x}" y1="${f.y+14}" x2="${t.x}" y2="${t.y-14}" stroke="${col}" stroke-width="${s.type==='found'?2:1}" ${dash} opacity="0.65"/>`;
+      }
+    }
+  });
+  Object.entries(pos).forEach(([key,{x,y}])=>{
+    const node=nodeMap[key];
+    if(!node)return;
+    let fill,stroke,tc;
+    if(node.type==='prune'||node.type==='leaf'&&node.lb>=(algoResult?.bestMakespan||Infinity)){fill='#FCEBEB';stroke='#E24B4A';tc='#A32D2D';}
+    else if(node.type==='found'){fill='#E1F5EE';stroke='#1D9E75';tc='#0F6E56';}
+    else{fill='#E6F1FB';stroke='#185FA5';tc='#185FA5';}
+    const label=node.perm.length>0?jobNames[node.perm[node.perm.length-1]]:'根';
+    const shortLabel=label.length>4?label.slice(0,3)+'…':label;
+    html+=`<g><circle cx="${x}" cy="${y}" r="14" fill="${fill}" stroke="${stroke}" stroke-width="${node.type==='found'?2:1}"/>
+      <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="600" fill="${tc}">${shortLabel}</text>
+      <text x="${x}" y="${y+24}" text-anchor="middle" font-size="8" fill="#73726c">${node.lb}</text></g>`;
+  });
+  const legend=[['#185FA5','探索'],['#E24B4A','剪枝'],['#1D9E75','最優']];
+  legend.forEach(([c,label],i)=>{
+    html+=`<circle cx="${20+i*80}" cy="${H-15}" r="6" fill="${c}"/><text x="${30+i*80}" y="${H-11}" font-size="10" fill="#73726c">${label}</text>`;
+  });
+  const svg=document.getElementById('tree-svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.innerHTML=html;
+}
+
+function drawGantt(){
+  if(!bestSchedule)return;
+  const canvas=document.getElementById('gantt-canvas');
+  const p=PRESETS[currentPreset];
+  const m=p.machines.length;
+  const makespan=bestSchedule.makespan;
+  const dpr=window.devicePixelRatio||1;
+  const W=Math.min(canvas.parentElement.clientWidth||800,860);
+  const ROW=38,PAD=12,LABEL=130,H=m*ROW+PAD*2+20;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const scale=(W-LABEL-PAD)/(makespan||1);
+  p.machines.forEach((mname,mi)=>{
+    const y=PAD+mi*ROW;
+    ctx.fillStyle='#888';
+    ctx.font='12px system-ui,sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText(mname,LABEL-8,y+ROW/2+4);
+    ctx.fillStyle='rgba(0,0,0,0.04)';
+    ctx.beginPath();
+    ctx.roundRect(LABEL,y+3,W-LABEL-PAD,ROW-6,4);
+    ctx.fill();
+  });
+  bestSchedule.events.forEach(({job,machine,start,end})=>{
+    const x=LABEL+start*scale;
+    const w=Math.max((end-start)*scale-2,4);
+    const y=PAD+machine*ROW+4;
+    ctx.fillStyle=JOB_COLORS[job];
+    ctx.beginPath();
+    ctx.roundRect(x,y,w,ROW-8,4);
+    ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.font='bold 11px system-ui,sans-serif';
+    ctx.textAlign='center';
+    if(w>36) ctx.fillText(p.jobs[job].name.split(' ')[0],x+w/2,y+(ROW-8)/2+4);
+  });
+  ctx.strokeStyle='rgba(0,0,0,0.1)';
+  ctx.lineWidth=0.5;
+  const tickEvery=Math.max(1,Math.ceil(makespan/10));
+  for(let t=0;t<=makespan;t+=tickEvery){
+    const x=LABEL+t*scale;
+    ctx.beginPath();ctx.moveTo(x,PAD);ctx.lineTo(x,PAD+m*ROW);ctx.stroke();
+    ctx.fillStyle='#888';
+    ctx.font='10px system-ui,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(t,x,PAD+m*ROW+14);
+  }
+  const tb=document.querySelector('#schedule-table tbody');
+  let rows='';
+  bestSchedule.events.sort((a,b)=>a.start-b.start).forEach(({job,machine,start,end,dur})=>{
+    rows+=`<tr>
+      <td><span style="background:${JOB_COLORS[job]};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">${p.jobs[job].name}</span></td>
+      <td>${p.machines[machine]}</td>
+      <td>${start}</td><td>${end}</td><td>${dur}</td>
+      <td><span class="badge badge-green">已排程</span></td>
+    </tr>`;
+  });
+  tb.innerHTML=rows;
+}
+
+function drawAnalysis(){
+  if(!algoResult)return;
+  const {totalBrute,totalExplored,lbHistory}=algoResult;
+  if(compareChart)compareChart.destroy();
+  compareChart=new Chart(document.getElementById('compare-canvas'),{
+    type:'bar',
+    data:{
+      labels:['暴力搜索 (n!)','分支定界法 (B&B)'],
+      datasets:[{
+        label:'節點數',data:[totalBrute,totalExplored],
+        backgroundColor:['rgba(162,45,45,0.2)','rgba(15,110,86,0.2)'],
+        borderColor:['#A32D2D','#0F6E56'],
+        borderWidth:2,borderRadius:8
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>'節點數: '+v.raw.toLocaleString()}}},
+      scales:{y:{beginAtZero:true,ticks:{font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}},
+              x:{ticks:{font:{size:12,weight:'500'}}}}
+    }
+  });
+  if(boundChart)boundChart.destroy();
+  const maxShow=Math.min(lbHistory.length,200);
+  const step=Math.max(1,Math.floor(lbHistory.length/maxShow));
+  const sampled=lbHistory.filter((_,i)=>i%step===0);
+  boundChart=new Chart(document.getElementById('bound-canvas'),{
+    type:'line',
+    data:{
+      labels:sampled.map(h=>h.explored),
+      datasets:[
+        {label:'下界 LB',data:sampled.map(h=>h.lb),borderColor:'#185FA5',backgroundColor:'rgba(24,95,165,0.07)',fill:true,tension:0.3,pointRadius:0,borderWidth:2},
+        {label:'最優上界 UB',data:sampled.map(h=>h.best),borderColor:'#0F6E56',borderDash:[6,3],backgroundColor:'transparent',tension:0.3,pointRadius:0,borderWidth:1.5,spanGaps:true}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11},boxWidth:14}}},
+      scales:{y:{ticks:{font:{size:10}}},x:{title:{display:true,text:'已探索節點數',font:{size:11}},ticks:{maxTicksLimit:6,font:{size:10}}}}
+    }
+  });
+}
+
+renderJobTable();
+</script>
+</body>
+</html>

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>急診室分診模擬器 | Max-Heap 優先排程與消毒冷卻系統</title>
+    <style>
+        /* ----- 全域變數：柔和現代醫療風格 ----- */
+        :root {
+            --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            --color-text-primary: #1b2f3f;
+            --color-text-secondary: #4a6f8a;
+            --color-text-tertiary: #7c9ebd;
+            --color-background-primary: #ffffff;
+            --color-background-secondary: #f5f9fe;
+            --color-border-secondary: #dfeaf2;
+            --color-border-tertiary: #cddeec;
+            --border-radius-md: 20px;
+            --border-radius-lg: 28px;
+            --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.04);
+            --shadow-float: 0 16px 28px rgba(0, 0, 0, 0.06);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-text-primary: #eef2f8;
+                --color-text-secondary: #b9d0ed;
+                --color-text-tertiary: #89abc9;
+                --color-background-primary: #0f1823;
+                --color-background-secondary: #1b2a3a;
+                --color-border-secondary: #2c4054;
+                --color-border-tertiary: #2e4a66;
+                --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.5);
+                --shadow-float: 0 12px 28px rgba(0, 0, 0, 0.6);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: linear-gradient(145deg, #edf2f9 0%, #e6eef7 100%);
+            color: var(--color-text-primary);
+            padding: 1.6rem 1.2rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(145deg, #0c141f 0%, #0f1a26 100%);
+            }
+        }
+
+        .w {
+            max-width: 1380px;
+            margin: 0 auto;
+            padding: 0 0 1.8rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+        }
+
+        /* 控制列 — 乾淨膠囊設計 */
+        .ctrl-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 1.8rem;
+            background: var(--color-background-primary);
+            backdrop-filter: blur(8px);
+            padding: 10px 24px;
+            border-radius: 80px;
+            box-shadow: var(--shadow-soft);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        .ctrl-row label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--color-background-secondary);
+            padding: 4px 16px 4px 20px;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+        }
+        .ctrl-row input[type="number"] {
+            width: 70px;
+            padding: 6px 10px;
+            border: 1px solid var(--color-border-tertiary);
+            border-radius: 48px;
+            background: var(--color-background-primary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-align: center;
+            transition: 0.2s;
+        }
+        .ctrl-row input:focus {
+            outline: none;
+            border-color: #1D9E75;
+            box-shadow: 0 0 0 2px rgba(29,158,117,0.2);
+        }
+        .btn {
+            padding: 6px 20px;
+            border: none;
+            border-radius: 40px;
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-soft);
+            border: 0.5px solid var(--color-border-tertiary);
+            font-family: inherit;
+        }
+        .btn:hover {
+            background: #e2ecf6;
+            transform: translateY(-1px);
+        }
+        .btn.p {
+            background: #1D9E75;
+            border: none;
+            color: white;
+            box-shadow: 0 4px 10px rgba(29,158,117,0.25);
+        }
+        .btn.p:hover {
+            background: #158563;
+            transform: scale(0.98);
+        }
+        @media (prefers-color-scheme: dark) {
+            .btn:hover { background: #2c4b6e; }
+            .btn.p { background: #2b9f7a; }
+        }
+
+        /* 統計卡片 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 1.8rem;
+        }
+        .sc {
+            background: var(--color-background-primary);
+            backdrop-filter: blur(6px);
+            border-radius: 32px;
+            padding: 18px 16px;
+            box-shadow: var(--shadow-float);
+            border: 0.5px solid var(--color-border-tertiary);
+            transition: all 0.2s;
+        }
+        .sc:hover {
+            transform: translateY(-3px);
+        }
+        .sc .lb {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            color: var(--color-text-tertiary);
+            margin-bottom: 8px;
+        }
+        .sc .vl {
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .sc .vl.g { color: #1D9E75; }
+        .sc .vl.r { color: #e76f51; }
+        .sc .vl.b { color: #3b82f6; }
+        @media (prefers-color-scheme: dark) {
+            .sc .vl.g { color: #6bc2a5; }
+            .sc .vl.r { color: #f4a261; }
+            .sc .vl.b { color: #60a5fa; }
+        }
+
+        /* 雙欄面板 */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 1.5rem;
+        }
+        .panel {
+            background: var(--color-background-primary);
+            border-radius: 36px;
+            box-shadow: var(--shadow-float);
+            border: 0.5px solid var(--color-border-tertiary);
+            overflow: hidden;
+            padding: 0;
+        }
+        .ph {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            color: var(--color-text-secondary);
+            padding: 14px 20px;
+            background: rgba(0,0,0,0.02);
+            border-bottom: 1px solid var(--color-border-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .heap-list, .q-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 14px 16px;
+        }
+        /* 自定義捲軸 */
+        .heap-list::-webkit-scrollbar, .q-list::-webkit-scrollbar, .log::-webkit-scrollbar {
+            width: 5px;
+        }
+        .heap-list::-webkit-scrollbar-track, .q-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .heap-list::-webkit-scrollbar-thumb {
+            background: var(--color-text-tertiary);
+            border-radius: 12px;
+        }
+        .hp-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 28px;
+            background: var(--color-background-secondary);
+            border: 0.5px solid var(--color-border-tertiary);
+            font-size: 0.75rem;
+            transition: all 0.1s;
+        }
+        .hp-item.top {
+            border-left: 4px solid #e76f51;
+            background: rgba(231,111,81,0.08);
+        }
+        .badge {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .sev1 { background: #FCEBEB; color: #B91C1C; }
+        .sev2 { background: #FAEEDA; color: #B45309; }
+        .sev3 { background: #E1F5EE; color: #0F6E56; }
+        .sev4 { background: #E6F1FB; color: #2563EB; }
+        @media (prefers-color-scheme: dark) {
+            .sev1 { background: #5e2a2a; color: #f9acac; }
+            .sev2 { background: #714518; color: #f8c48c; }
+            .sev3 { background: #1b5443; color: #96e8cf; }
+            .sev4 { background: #1d4470; color: #a3c9ff; }
+        }
+        .hp-name {
+            flex: 1;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .hp-score {
+            font-size: 0.7rem;
+            color: var(--color-text-tertiary);
+            font-weight: 500;
+        }
+
+        /* Queue 項目 */
+        .q-list {
+            max-height: 280px;
+        }
+        .q-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-radius: 32px;
+            border: 1px solid var(--color-border-tertiary);
+            background: var(--color-background-secondary);
+            font-size: 0.75rem;
+            transition: 0.1s;
+        }
+        .q-item.ready {
+            border-color: #1D9E75;
+            background: rgba(29,158,117,0.12);
+            box-shadow: 0 0 0 1px rgba(29,158,117,0.2);
+        }
+        .qname {
+            font-weight: 600;
+        }
+        .qcd {
+            font-size: 0.7rem;
+            color: var(--color-text-tertiary);
+        }
+
+        /* 日誌區塊 */
+        .log {
+            max-height: 220px;
+            overflow-y: auto;
+            background: var(--color-background-secondary);
+            border-radius: 28px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .log-line {
+            font-size: 0.75rem;
+            padding: 6px 8px;
+            border-bottom: 0.5px solid var(--color-border-tertiary);
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+        }
+        .log-line:last-child {
+            border-bottom: none;
+        }
+        .log-t {
+            color: var(--color-text-tertiary);
+            width: 44px;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+        .log-a {
+            flex: 1;
+            font-weight: 500;
+        }
+        .log-a.idle {
+            color: #e68a2e;
+        }
+        .log-a.treat {
+            color: #1D9E75;
+        }
+        @media (prefers-color-scheme: dark) {
+            .log-a.idle { color: #f0b17c; }
+            .log-a.treat { color: #72dbb7; }
+        }
+
+        .note-box {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+            padding: 12px 18px;
+            border-radius: 32px;
+            background: var(--color-background-primary);
+            border-left: 5px solid #1D9E75;
+            margin-bottom: 1.2rem;
+            box-shadow: var(--shadow-soft);
+            font-weight: 500;
+        }
+        i.ti {
+            font-style: normal;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+<div class="w">
+<h2 class="sr-only">急診室分診模擬器：以 Max-Heap 排定病患優先級，診間消毒冷卻以 Queue 管理</h2>
+
+<div class="ctrl-row">
+  <label>🏥 病患批次 <input type="number" id="nPat" min="5" max="80" value="20"></label>
+  <label>🛏️ 診間數 <input type="number" id="nRoom" min="1" max="8" value="3"></label>
+  <label>🧼 消毒冷卻(分鐘) <input type="number" id="cdRoom" min="1" max="10" value="2"></label>
+  <button class="btn p" onclick="runER()">✨ 新模擬</button>
+  <button class="btn" onclick="stepER(-1)">◀ 上步</button>
+  <button class="btn" onclick="stepER(1)">下步 ▶</button>
+  <button class="btn" onclick="stepER(9999)">⏭ 完成</button>
+</div>
+
+<div class="stats">
+  <div class="sc"><div class="lb">📋 總病患</div><div class="vl b" id="e-total">-</div></div>
+  <div class="sc"><div class="lb">✅ 已處理</div><div class="vl g" id="e-done">-</div></div>
+  <div class="sc"><div class="lb">⏳ 診間閒置次數</div><div class="vl r" id="e-idle">-</div></div>
+  <div class="sc"><div class="lb">⚙️ 稼動率</div><div class="vl g" id="e-util">-</div></div>
+</div>
+
+<div class="note-box" id="e-note">🏥 按「新模擬」開始分診排程</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="ph">⬇️ Max-Heap 候診佇列（緊急度優先）</div>
+    <div class="heap-list" id="e-heap"></div>
+  </div>
+  <div class="panel">
+    <div class="ph">🌀 消毒冷卻 Queue (FIFO)</div>
+    <div class="q-list" id="e-queue"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:1rem">
+  <div class="ph">📜 診療日誌 · 時間軸記錄</div>
+  <div class="log" id="e-log"></div>
+</div>
+</div>
+
+<script>
+    // ---------- 以下完全保留原始邏輯，僅外觀美化，所有演算法未改動 ----------
+    const NAMES=['陳先生','林女士','王小弟','張老太','黃醫護','吳先生','李女士','劉工程師','蔡老先生','鄭同學','許太太','謝先生','邱女士','洪小妹','游先生','葉女士','賴先生','蕭女士','彭先生','何先生','孫女士','韓先生','曹女士','魏先生','田女士'];
+    const CONDITIONS=['心肌梗塞','骨折','高燒39°C','頭部撞傷','腹痛','輕微擦傷','呼吸困難','嚴重過敏','眩暈','輕度扭傷','刀傷','燙傷','中暑','血壓異常','意識模糊'];
+    const SEV_LABELS=['P1危急','P2嚴重','P3中等','P4輕微'];
+
+    let erSteps=[], erCur=0;
+
+    function sevClass(s){return 'sev'+s}
+    function sevColor(s){return ['#A32D2D','#854F0B','#0F6E56','#185FA5'][s-1]}
+
+    class MaxHeap{
+      constructor(){this.h=[]}
+      push(it){this.h.push(it);this._up(this.h.length-1)}
+      pop(){
+        if(!this.h.length)return null;
+        let t=this.h[0];
+        let l=this.h.pop();
+        if(this.h.length){this.h[0]=l;this._dn(0)}
+        return t;
+      }
+      peek(){return this.h[0]||null}
+      get size(){return this.h.length}
+      _up(i){
+        while(i>0){
+          let p=(i-1)>>1;
+          if(this.h[p].score>=this.h[i].score)break;
+          [this.h[p],this.h[i]]=[this.h[i],this.h[p]];i=p;
+        }
+      }
+      _dn(i){
+        let n=this.h.length;
+        while(true){
+          let s=i,l=2*i+1,r=2*i+2;
+          if(l<n&&this.h[l].score>this.h[s].score)s=l;
+          if(r<n&&this.h[r].score>this.h[s].score)s=r;
+          if(s===i)break;
+          [this.h[s],this.h[i]]=[this.h[i],this.h[s]];i=s;
+        }
+      }
+    }
+
+    function runER(){
+      let nPat=Math.min(80,Math.max(5,parseInt(document.getElementById('nPat').value)||20));
+      let nRoom=Math.min(8,Math.max(1,parseInt(document.getElementById('nRoom').value)||3));
+      let cd=Math.min(10,Math.max(1,parseInt(document.getElementById('cdRoom').value)||2));
+
+      let patients=[];
+      let usedNames=[];
+      for(let i=0;i<nPat;i++){
+        let nm=NAMES[i%NAMES.length]+(i>=NAMES.length?'('+Math.ceil((i-NAMES.length+1)/NAMES.length)+')':'');
+        let sev=Math.ceil(Math.random()*4);
+        let cond=CONDITIONS[Math.floor(Math.random()*CONDITIONS.length)];
+        let score=sev===1?Math.floor(Math.random()*10)+91:sev===2?Math.floor(Math.random()*20)+61:sev===3?Math.floor(Math.random()*20)+31:Math.floor(Math.random()*30)+1;
+        patients.push({name:nm,sev,cond,score});
+      }
+
+      let heap=new MaxHeap();
+      for(let p of patients) heap.push({...p});
+
+      let coolQueue=[];
+      let rooms=Array(nRoom).fill(0);
+      let time=0,idle=0,done=0;
+      let steps=[];
+
+      function snap(action,isIdle,poppedPat){
+        steps.push({
+          time,idle,done,action,isIdle,
+          heap:heap.h.map(x=>({...x})),
+          queue:coolQueue.map(x=>[...x]),
+          poppedPat:poppedPat?{...poppedPat}:null
+        });
+      }
+
+      let maxT=nPat*(cd+1)*nRoom+200;
+      while((heap.size>0||coolQueue.length>0)&&time<maxT){
+        for(let [readyAt,,pat] of coolQueue.filter(([rt])=>rt<=time)){
+          heap.push({...pat});
+        }
+        coolQueue=coolQueue.filter(([rt])=>rt>time);
+
+        if(heap.size>0){
+          let pat=heap.pop();
+          let action=`診間接診 ${pat.name}（${pat.cond}，緊急度${pat.score}）`;
+          coolQueue.push([time+cd+1,'room',pat]);
+          done++;
+          snap(action,false,pat);
+        } else {
+          idle++;
+          snap('診間等待消毒中（Idle）',true,null);
+        }
+        time++;
+      }
+
+      erSteps=steps;
+      erCur=0;
+      document.getElementById('e-total').textContent=nPat;
+      renderERStep();
+    }
+
+    function stepER(d){
+      if(!erSteps.length)return;
+      if(d===9999)erCur=erSteps.length-1;
+      else erCur=Math.max(0,Math.min(erSteps.length-1,erCur+d));
+      renderERStep();
+    }
+
+    function renderERStep(){
+      if(!erSteps.length)return;
+      let s=erSteps[erCur];
+      document.getElementById('e-done').textContent=s.done;
+      document.getElementById('e-idle').textContent=s.idle;
+      let util=s.time>0?((s.time-s.idle)/s.time*100).toFixed(1)+'%':'—';
+      document.getElementById('e-util').textContent=util;
+      document.getElementById('e-note').innerHTML=`⏱️ 時間 T${s.time}：${s.action}  &nbsp;&nbsp;📌 步驟 ${erCur+1}/${erSteps.length}`;
+
+      let hl=document.getElementById('e-heap');
+      hl.innerHTML=s.heap.length===0?'<div style="font-size:12px;color:var(--color-text-tertiary);padding:12px;text-align:center;">🏥 候診室已清空</div>':
+        s.heap.map((p,i)=>`
+          <div class="hp-item${i===0?' top':''}">
+            <div class="badge ${sevClass(p.sev)}">${p.sev}</div>
+            <div class="hp-name">${p.name}</div>
+            <div style="font-size:0.7rem;color:${sevColor(p.sev)}; font-weight:500;">${p.cond}</div>
+            <div class="hp-score">⚡${p.score}</div>
+          </div>`).join('');
+
+      let ql=document.getElementById('e-queue');
+      ql.innerHTML=s.queue.length===0?'<div style="font-size:12px;color:var(--color-text-tertiary);padding:12px;text-align:center;">🧴 冷卻 Queue 為空</div>':
+        s.queue.map(([rt,,p])=>`
+          <div class="q-item${rt<=s.time?' ready':''}">
+            <span class="qname">${p.name}</span>
+            <span class="qcd">${rt<=s.time?'✅ 可解凍':'⏳ 消毒完成 @ T'+rt}</span>
+          </div>`).join('');
+
+      let log=document.getElementById('e-log');
+      let lines=erSteps.slice(0,erCur+1).map(x=>
+        `<div class="log-line"><span class="log-t">T${x.time}</span><span class="log-a${x.isIdle?' idle':' treat'}">${x.action}</span></div>`
+      ).join('');
+      log.innerHTML=lines||'<div style="font-size:12px;color:var(--color-text-tertiary);text-align:center;">尚無記錄</div>';
+      log.scrollTop=log.scrollHeight;
+    }
+
+    runER();
+</script>
+</body>
+</html>

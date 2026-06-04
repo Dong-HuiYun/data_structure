@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>智慧製造排程模擬器 | Max-Heap 冷卻調度系統</title>
+    <style>
+        /* ----- 基礎變數：柔和現代風格，保留原變數相容 ----- */
+        :root {
+            --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            --color-text-primary: #1e2f3e;
+            --color-text-secondary: #4a6a7f;
+            --color-text-tertiary: #7c9ab3;
+            --color-background-primary: #ffffff;
+            --color-background-secondary: #f8fafd;
+            --color-border-secondary: #e2edf2;
+            --color-border-tertiary: #d4e2e9;
+            --border-radius-md: 20px;
+            --border-radius-lg: 28px;
+            --color-text-success: #2c7a5e;
+            --color-text-warning: #c06d2b;
+            --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.06);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-text-primary: #eef2f8;
+                --color-text-secondary: #b9cfec;
+                --color-text-tertiary: #8aa9c9;
+                --color-background-primary: #0f1822;
+                --color-background-secondary: #1a2a38;
+                --color-border-secondary: #2a4050;
+                --color-border-tertiary: #2e4a5e;
+                --color-text-success: #6bc2a5;
+                --color-text-warning: #f4b57c;
+                --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: linear-gradient(145deg, #f1f5f9 0%, #eef2f6 100%);
+            color: var(--color-text-primary);
+            padding: 1.5rem 1.2rem;
+            line-height: 1.4;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(145deg, #0d151e 0%, #0f1922 100%);
+            }
+        }
+
+        .wrap {
+            max-width: 1380px;
+            margin: 0 auto;
+            padding: 0 0 1rem;
+        }
+
+        h2.sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+        }
+
+        /* 控制列美化 */
+        .ctrl {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 1.6rem;
+            background: var(--color-background-primary);
+            backdrop-filter: blur(4px);
+            padding: 12px 20px;
+            border-radius: 60px;
+            box-shadow: var(--shadow-sm);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        .ctrl label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--color-background-secondary);
+            padding: 2px 10px 2px 14px;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+        }
+        .ctrl select, .ctrl input[type="number"] {
+            padding: 6px 12px;
+            border: 1px solid var(--color-border-tertiary);
+            border-radius: 32px;
+            background: var(--color-background-primary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            width: 80px;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .ctrl select:focus, .ctrl input:focus {
+            outline: none;
+            border-color: #1d9e75;
+            box-shadow: 0 0 0 2px rgba(29,158,117,0.2);
+        }
+        button {
+            padding: 7px 20px;
+            border: none;
+            border-radius: 40px;
+            background: var(--color-background-secondary);
+            color: var(--color-text-primary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            font-family: inherit;
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        button:hover {
+            background: #e5edf4;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+        }
+        button.primary {
+            background: #1d9e75;
+            border: none;
+            color: white;
+            box-shadow: 0 4px 8px rgba(29,158,117,0.2);
+        }
+        button.primary:hover {
+            background: #158563;
+            transform: scale(0.98);
+        }
+        @media (prefers-color-scheme: dark) {
+            button:hover {
+                background: #2e4a62;
+            }
+            button.primary {
+                background: #2b9f7a;
+            }
+        }
+
+        /* 統計卡片 */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 1.6rem;
+        }
+        .card {
+            background: var(--color-background-primary);
+            backdrop-filter: blur(6px);
+            border-radius: 32px;
+            padding: 16px 20px;
+            box-shadow: var(--shadow-md);
+            border: 0.5px solid var(--color-border-tertiary);
+            transition: all 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+        }
+        .card .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            color: var(--color-text-tertiary);
+            margin-bottom: 8px;
+        }
+        .card .val {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .card .val.good { color: var(--color-text-success); }
+        .card .val.warn { color: var(--color-text-warning); }
+
+        /* 輸入串流 */
+        .input-list {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+            word-break: break-all;
+            margin-bottom: 1rem;
+            background: var(--color-background-secondary);
+            border-radius: 48px;
+            padding: 10px 18px;
+            max-height: 70px;
+            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        .input-list span {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 30px;
+            background: var(--color-background-primary);
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .note {
+            font-size: 0.75rem;
+            color: var(--color-text-tertiary);
+            background: var(--color-background-secondary);
+            padding: 12px 16px;
+            border-radius: 28px;
+            border-left: 4px solid #1d9e75;
+            margin-top: 6px;
+        }
+
+        .section {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--color-text-secondary);
+            margin: 1rem 0 0.6rem;
+        }
+
+        /* 主區塊卡片 */
+        .heap-area, .queue-area {
+            background: var(--color-background-primary);
+            border-radius: 36px;
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            border: 0.5px solid var(--color-border-tertiary);
+            margin-bottom: 1rem;
+        }
+        .heap-tree-wrap {
+            overflow-x: auto;
+            display: flex;
+            justify-content: center;
+        }
+        svg.heap-tree {
+            background: radial-gradient(circle at 30% 20%, rgba(29,158,117,0.02), transparent);
+            border-radius: 32px;
+        }
+
+        /* Queue 項目 */
+        .queue-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            min-height: 70px;
+        }
+        .q-item {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 40px;
+            background: var(--color-background-secondary);
+            border: 1px solid var(--color-border-tertiary);
+            color: var(--color-text-primary);
+            transition: all 0.1s;
+        }
+        .q-item.ready {
+            border-color: #1d9e75;
+            background: rgba(29,158,117,0.1);
+            color: #1d9e75;
+            font-weight: 600;
+            box-shadow: 0 0 6px rgba(29,158,117,0.2);
+        }
+
+        /* 時間軸 */
+        .timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding: 8px 4px;
+            background: var(--color-background-secondary);
+            border-radius: 28px;
+        }
+        .t-slot {
+            width: 44px;
+            height: 44px;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            transition: 0.1s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .t-slot.work {
+            background: #c3f0e3;
+            color: #1a5e48;
+            border: 0.5px solid #94dbc2;
+        }
+        .t-slot.idle {
+            background: #ffe3bf;
+            color: #b45f1b;
+            border: 0.5px solid #f7cd94;
+        }
+        @media (prefers-color-scheme: dark) {
+            .t-slot.work { background: #12453b; color: #9fe1cb; border-color: #217a60; }
+            .t-slot.idle { background: #593812; color: #faca85; border-color: #9b641f; }
+        }
+
+        /* 長條圖分佈 */
+        .bar-wrap {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            background: var(--color-background-secondary);
+            padding: 8px 14px;
+            border-radius: 48px;
+        }
+        .bar-wrap .blabel {
+            font-size: 0.8rem;
+            font-weight: 600;
+            width: 44px;
+            text-align: right;
+            color: var(--color-text-primary);
+        }
+        .bar {
+            height: 28px;
+            border-radius: 18px;
+            background: linear-gradient(90deg, #2b9e7a, #3bcb9a);
+            min-width: 10px;
+            transition: width 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+        .bar.idle {
+            background: linear-gradient(90deg, #e68a2e, #f5b267);
+        }
+        .bar-wrap .bval {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+        }
+
+        /* Tab 切換 */
+        .tab-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 1.2rem;
+            flex-wrap: wrap;
+        }
+        .tab-bar button {
+            border-radius: 40px;
+            padding: 6px 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--color-background-secondary);
+            border: 0.5px solid var(--color-border-tertiary);
+        }
+        .tab-bar button.active {
+            background: #1d9e75;
+            color: white;
+            border-color: #1d9e75;
+            box-shadow: 0 4px 10px rgba(29,158,117,0.3);
+        }
+        .panel {
+            display: none;
+            animation: fadeIn 0.2s ease;
+        }
+        .panel.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+
+        /* Max-Heap 節點裝飾相容 (保持原有node風格但美化) */
+        .heap-node, svg text {
+            user-select: none;
+        }
+        .heap-step-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+<h2 class="sr-only">智慧製造排程模擬器：Max-Heap 與 Queue 冷卻調度，顯示生產線稼動率與閒置統計</h2>
+
+<div class="ctrl">
+  <label>📦 產品種類 P
+    <input type="number" id="nTypes" min="2" max="50" value="10">
+  </label>
+  <label>📊 總件數
+    <input type="number" id="nJobs" min="10" max="500" value="50">
+  </label>
+  <label>❄️ 冷卻週期 n=
+    <input type="number" id="cooldown" min="1" max="10" value="3">
+  </label>
+  <button class="primary" onclick="runSim()">▶ 重新模擬</button>
+  <button onclick="showStep(-1)">◀ 上一步</button>
+  <button onclick="showStep(1)">下一步 ▶</button>
+  <button onclick="showStep(999999)">⏭ 跳到結尾</button>
+</div>
+
+<div class="input-list" id="inputList"></div>
+
+<div class="stats">
+  <div class="card"><div class="label">📐 理論最少耗時</div><div class="val" id="s-theory">-</div></div>
+  <div class="card"><div class="label">⏱️ 實際總耗時</div><div class="val warn" id="s-actual">-</div></div>
+  <div class="card"><div class="label">🔄 閒置次數 (Idle)</div><div class="val warn" id="s-idle">-</div></div>
+  <div class="card"><div class="label">⚙️ 稼動率</div><div class="val good" id="s-util">-</div></div>
+</div>
+
+<div class="note" id="stepNote" style="margin-bottom:.8rem;"></div>
+
+<div class="tab-bar">
+  <button class="active" onclick="switchTab('heap')">🌲 Max-Heap 樹狀結構</button>
+  <button onclick="switchTab('queue')">❄️ 冷卻 Queue (FIFO)</button>
+  <button onclick="switchTab('timeline')">📅 Time Slots 時間軸</button>
+  <button onclick="switchTab('dist')">📈 產品分佈統計</button>
+</div>
+
+<div id="tab-heap" class="panel active">
+  <div class="heap-area">
+    <div class="heap-tree-wrap">
+      <svg class="heap-tree" id="heapSvg" viewBox="0 0 640 200" width="100%" height="auto" style="min-height:200px"></svg>
+    </div>
+    <div class="note" style="margin-top:12px">🔹 節點顯示：型號 / 剩餘件數 &nbsp;&nbsp; 🟠 橘色邊框 = 當前操作節點 &nbsp;&nbsp; 🔴 紅色背景 = 剛彈出</div>
+  </div>
+</div>
+
+<div id="tab-queue" class="panel">
+  <div class="queue-area">
+    <div class="section" style="margin-top:0">⏳ 冷卻等待區（Queue — 先進先出輸送帶）</div>
+    <div class="queue-items" id="queueDisplay"></div>
+    <div class="note" style="margin-top:10px">🟢 綠色邊框表示該件已冷卻完成 (解凍時間 ≤ 當前時間)</div>
+  </div>
+</div>
+
+<div id="tab-timeline" class="panel">
+  <div class="section">🎬 每個 Time Slot 執行序列</div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div id="tab-dist" class="panel">
+  <div class="section">📊 各產品型號執行次數分佈</div>
+  <div id="distChart" style="display:flex; flex-direction:column; gap:8px;"></div>
+</div>
+
+</div>
+
+<script>
+    // ---------- 原始邏輯完全保留，僅視覺更新不影響任何演算 ----------
+    let steps=[], curStep=0, simResult={};
+
+    function rand(a,b){return a+Math.floor(Math.random()*(b-a+1))}
+
+    function genJobs(nTypes,nJobs){
+      let jobs=[];
+      for(let i=0;i<nJobs;i++) jobs.push('P'+(rand(1,nTypes)));
+      return jobs;
+    }
+
+    class MinHeap{
+      constructor(){this.h=[]}
+      push(item){this.h.push(item);this._up(this.h.length-1)}
+      pop(){let t=this.h[0];let l=this.h.pop();if(this.h.length){this.h[0]=l;this._down(0)}return t}
+      peek(){return this.h[0]}
+      get size(){return this.h.length}
+      _up(i){while(i>0){let p=(i-1)>>1;if(this.h[p][0]<=this.h[i][0])break;[this.h[p],this.h[i]]=[this.h[i],this.h[p]];i=p}}
+      _down(i){let n=this.h.length;while(true){let s=i,l=2*i+1,r=2*i+2;if(l<n&&this.h[l][0]<this.h[s][0])s=l;if(r<n&&this.h[r][0]<this.h[s][0])s=r;if(s===i)break;[this.h[s],this.h[i]]=[this.h[i],this.h[s]];i=s}}
+    }
+
+    function simulate(jobs, n){
+      let freq={};
+      for(let j of jobs) freq[j]=(freq[j]||0)+1;
+
+      let heap=new MinHeap();
+      for(let [k,v] of Object.entries(freq)) heap.push([-v,k]);
+
+      let queue=[];
+      let time=0, idle=0;
+      let timeline=[];
+      let stepsArr=[];
+
+      function snapshot(action, poppedType, heapSnap, queueSnap){
+        stepsArr.push({
+          time, idle, action,
+          poppedType,
+          heap: heapSnap.map(x=>[...x]),
+          queue: queueSnap.map(x=>[...x]),
+          timelineSnap: timeline.map(x=>({...x}))
+        });
+      }
+
+      while(heap.size>0||queue.length>0){
+        let action='';
+        let poppedType=null;
+
+        while(queue.length>0 && queue[0][0]<=time){
+          let [,type,cnt]=queue.shift();
+          heap.push([-cnt,type]);
+        }
+
+        let heapSnap=heap.h.map(x=>[...x]);
+        let queueSnap=queue.map(x=>[...x]);
+
+        if(heap.size>0){
+          let [neg,type]=heap.pop();
+          let cnt=-neg;
+          poppedType=type;
+          action=`執行 ${type}（剩餘 ${cnt} → ${cnt-1}）`;
+          timeline.push({t:time,type,isIdle:false});
+          if(cnt-1>0) queue.push([time+n+1, type, cnt-1]);
+        } else {
+          action='Idle（等待冷卻）';
+          timeline.push({t:time,type:'Idle',isIdle:true});
+          idle++;
+        }
+
+        snapshot(action, poppedType, heapSnap, queueSnap);
+        time++;
+        if(time>5000) break;
+      }
+
+      return {steps:stepsArr, totalTime:time, idle, jobs, freq};
+    }
+
+    function runSim(){
+      let nTypes=parseInt(document.getElementById('nTypes').value)||10;
+      let nJobs=parseInt(document.getElementById('nJobs').value)||50;
+      let n=parseInt(document.getElementById('cooldown').value)||3;
+      nTypes=Math.max(2,Math.min(50,nTypes));
+      nJobs=Math.max(10,Math.min(500,nJobs));
+      n=Math.max(1,Math.min(10,n));
+
+      let jobs=genJobs(nTypes,nJobs);
+      simResult=simulate(jobs,n);
+      steps=simResult.steps;
+      curStep=0;
+
+      let il=document.getElementById('inputList');
+      il.innerHTML=jobs.map(j=>`<span>${j}</span>`).join('');
+
+      let theory=nJobs;
+      let actual=simResult.totalTime;
+      let idle_cnt=simResult.idle;
+      let util=((actual-idle_cnt)/actual*100).toFixed(1);
+      document.getElementById('s-theory').textContent=theory+' 單位';
+      document.getElementById('s-actual').textContent=actual+' 單位';
+      document.getElementById('s-idle').textContent=idle_cnt+' 次';
+      document.getElementById('s-util').textContent=util+'%';
+
+      renderDistChart();
+      renderStep();
+    }
+
+    function showStep(delta){
+      if(!steps.length) return;
+      if(delta===999999) curStep=steps.length-1;
+      else curStep=Math.max(0,Math.min(steps.length-1,curStep+delta));
+      renderStep();
+    }
+
+    function renderStep(){
+      if(!steps.length) return;
+      let s=steps[curStep];
+
+      document.getElementById('stepNote').innerHTML=
+        `⏱️ Time ${s.time}：${s.action}  &nbsp;&nbsp;📌 步驟 ${curStep+1}/${steps.length} &nbsp;|&nbsp; 累計 Idle = ${s.idle}`;
+
+      renderHeap(s.heap, s.poppedType);
+      renderQueue(s.queue, s.time);
+      renderTimeline(s.timelineSnap);
+    }
+
+    function renderHeap(heapArr, poppedType){
+      let svg=document.getElementById('heapSvg');
+      svg.innerHTML='';
+      if(heapArr.length===0){
+        let t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x','320');t.setAttribute('y','100');
+        t.setAttribute('text-anchor','middle');t.setAttribute('font-size','14');
+        t.setAttribute('fill','var(--color-text-secondary)');
+        t.textContent='🏭 Heap 已清空';
+        svg.appendChild(t);
+        return;
+      }
+
+      let n=heapArr.length;
+      let depth=Math.floor(Math.log2(n))+1;
+      let svgH=Math.max(130,depth*70+20);
+      svg.setAttribute('viewBox',`0 0 640 ${svgH}`);
+      svg.setAttribute('height',svgH);
+
+      function getXY(i){
+        let d=Math.floor(Math.log2(i+1));
+        let posInRow=i-(Math.pow(2,d)-1);
+        let totalInRow=Math.pow(2,d);
+        let x=320+(posInRow-(totalInRow-1)/2)*(640/(totalInRow+1));
+        let y=30+d*65;
+        return {x,y};
+      }
+
+      for(let i=1;i<n;i++){
+        let p=(i-1)>>1;
+        let {x:px,y:py}=getXY(p);
+        let {x:cx,y:cy}=getXY(i);
+        let line=document.createElementNS('http://www.w3.org/2000/svg','line');
+        line.setAttribute('x1',px);line.setAttribute('y1',py+20);
+        line.setAttribute('x2',cx);line.setAttribute('y2',cy-18);
+        line.setAttribute('stroke','var(--color-border-tertiary)');
+        line.setAttribute('stroke-width','1.5');
+        line.setAttribute('stroke-dasharray','2 2');
+        svg.appendChild(line);
+      }
+
+      for(let i=0;i<n;i++){
+        let [neg,type]=heapArr[i];
+        let cnt=-neg;
+        let {x,y}=getXY(i);
+        let isTop=(i===0);
+        let isPopped=(type===poppedType && i===0);
+
+        let g=document.createElementNS('http://www.w3.org/2000/svg','g');
+        let fill = isPopped ? '#fceaea' : (isTop ? '#fff1df' : '#e8f5ef');
+        let stroke = isPopped ? '#e68686' : (isTop ? '#e68a2e' : '#62bba0');
+        let textColor = isPopped ? '#b13b3b' : (isTop ? '#b45f1b' : '#1f6e55');
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          fill = isPopped ? '#4e2a2a' : (isTop ? '#54401f' : '#1c4239');
+          stroke = isPopped ? '#c67171' : (isTop ? '#e68a2e' : '#4dae8c');
+          textColor = isPopped ? '#f59898' : (isTop ? '#efc48c' : '#83dfc0');
+        }
+
+        let rx=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        rx.setAttribute('x',x-30);rx.setAttribute('y',y-20);
+        rx.setAttribute('width','60');rx.setAttribute('height','40');
+        rx.setAttribute('rx','14');
+        rx.setAttribute('fill',fill);
+        rx.setAttribute('stroke',stroke);
+        rx.setAttribute('stroke-width','2');
+        rx.setAttribute('filter','drop-shadow(0 2px 4px rgba(0,0,0,0.05))');
+        g.appendChild(rx);
+
+        let t1=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t1.setAttribute('x',x);t1.setAttribute('y',y-5);
+        t1.setAttribute('text-anchor','middle');t1.setAttribute('dominant-baseline','central');
+        t1.setAttribute('font-size','12');t1.setAttribute('font-weight','700');
+        t1.setAttribute('fill',textColor);
+        t1.textContent=type;
+        g.appendChild(t1);
+
+        let t2=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t2.setAttribute('x',x);t2.setAttribute('y',y+12);
+        t2.setAttribute('text-anchor','middle');t2.setAttribute('dominant-baseline','central');
+        t2.setAttribute('font-size','11');
+        t2.setAttribute('fill',textColor);
+        t2.textContent='剩餘 '+cnt;
+        g.appendChild(t2);
+
+        svg.appendChild(g);
+      }
+    }
+
+    function renderQueue(qArr, curTime){
+      let div=document.getElementById('queueDisplay');
+      div.innerHTML='';
+      if(!qArr.length){div.innerHTML='<span style="color:var(--color-text-tertiary);font-size:0.8rem">✨ 冷卻 Queue 為空，無等待任務</span>';return;}
+      for(let [readyAt,type,cnt] of qArr){
+        let el=document.createElement('div');
+        el.className='q-item'+(readyAt<=curTime?' ready':'');
+        el.textContent=`${type} × ${cnt}  (解凍 T${readyAt})`;
+        div.appendChild(el);
+      }
+    }
+
+    function renderTimeline(tl){
+      let div=document.getElementById('timeline');
+      div.innerHTML='';
+      if(!tl.length){div.innerHTML='<div class="note">尚無時間軸記錄</div>';return;}
+      for(let {t,type,isIdle} of tl){
+        let el=document.createElement('div');
+        el.className='t-slot '+(isIdle?'idle':'work');
+        el.title=`T${t}: ${type}`;
+        el.textContent=isIdle?'◌':type.replace('P','');
+        div.appendChild(el);
+      }
+      div.scrollTop=div.scrollHeight;
+    }
+
+    function renderDistChart(){
+      let freq=simResult.freq;
+      let div=document.getElementById('distChart');
+      let entries=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+      let maxV=entries[0]?entries[0][1]:1;
+      div.innerHTML=entries.map(([k,v])=>
+        `<div class="bar-wrap">
+          <div class="blabel">${k}</div>
+          <div class="bar" style="width:${Math.max(5,v/maxV*280)}px"></div>
+          <div class="bval">${v} 件</div>
+        </div>`
+      ).join('');
+    }
+
+    function switchTab(name){
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.tab-bar button').forEach(b=>b.classList.remove('active'));
+      document.getElementById('tab-'+name).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    runSim();
+</script>
+</body>
+</html>

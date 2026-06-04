@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>金門大學學餐｜動態預約與訂單優化系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       全域變數與主題色
+    ============================================================ */
+    :root {
+      --bg:        #0a0e1a;
+      --surface:   #111827;
+      --surface2:  #1a2235;
+      --border:    #1e2d45;
+      --accent-express:  #00e5a0;  /* 快取車道 — 翠綠螢光 */
+      --accent-priority: #fbbf24;  /* 優先佇列  — 琥珀黃  */
+      --accent-standard: #60a5fa;  /* 一般佇列  — 冰藍    */
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --card-shadow: 0 4px 24px rgba(0,0,0,0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans TC', sans-serif;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 40% at 50% -10%, rgba(0,229,160,0.08) 0%, transparent 60%),
+        linear-gradient(180deg, #0a0e1a 0%, #06091200 100%);
+    }
+
+    /* ---- 單字等寬字體 (訂單 ID) ---- */
+    .mono { font-family: 'Space Mono', monospace; }
+
+    /* ---- 霓虹邊框工具類別 ---- */
+    .neon-express  { box-shadow: 0 0 0 1px var(--accent-express),  0 0 12px rgba(0,229,160,0.25); }
+    .neon-priority { box-shadow: 0 0 0 1px var(--accent-priority), 0 0 12px rgba(251,191,36,0.25); }
+    .neon-standard { box-shadow: 0 0 0 1px var(--accent-standard), 0 0 12px rgba(96,165,250,0.25); }
+
+    /* ---- 頁首標題漸層 ---- */
+    .title-gradient {
+      background: linear-gradient(90deg, var(--accent-express) 0%, #38bdf8 60%, var(--accent-priority) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ---- 表單元素 ---- */
+    select, input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 14px;
+      width: 100%;
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    select:focus, input:focus {
+      border-color: var(--accent-express);
+      box-shadow: 0 0 0 3px rgba(0,229,160,0.15);
+    }
+    select option { background: var(--surface2); }
+
+    /* ---- 按鈕基底 ---- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 11px 22px; border-radius: 9px; border: none;
+      font-family: inherit; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; transition: all .18s; letter-spacing: 0.04em;
+    }
+    .btn-express  { background: var(--accent-express);  color: #000; }
+    .btn-priority { background: var(--accent-priority); color: #000; }
+    .btn-standard { background: var(--accent-standard); color: #000; }
+    .btn-ghost {
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); filter: brightness(0.95); }
+
+    /* ---- 訂單卡片動畫 ---- */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px) scale(0.92); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes popOut {
+      from { opacity: 1; transform: scale(1); }
+      to   { opacity: 0; transform: scale(0.7) translateY(-12px); }
+    }
+    .order-card {
+      animation: slideIn .35s cubic-bezier(.22,1,.36,1) forwards;
+      border-radius: 10px; padding: 10px 14px;
+      font-size: 0.8rem; line-height: 1.55;
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 130px; max-width: 150px;
+      flex-shrink: 0;
+    }
+    .order-card.removing { animation: popOut .3s ease forwards; }
+
+    /* 每種佇列的卡片配色 */
+    .card-express  { background: rgba(0,229,160,0.1);  border: 1px solid rgba(0,229,160,0.4); }
+    .card-priority { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.4); }
+    .card-standard { background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.4); }
+
+    /* ---- 佇列容器水平滾動 ---- */
+    .queue-track {
+      display: flex; flex-direction: row; gap: 10px;
+      overflow-x: auto; padding-bottom: 8px;
+      min-height: 90px; align-items: center;
+    }
+    .queue-track::-webkit-scrollbar { height: 4px; }
+    .queue-track::-webkit-scrollbar-track { background: var(--surface2); }
+    .queue-track::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ---- 空佇列提示 ---- */
+    .queue-empty {
+      color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em;
+      text-transform: uppercase; padding: 8px 0;
+      pointer-events: none; user-select: none;
+    }
+
+    /* ---- 統計數字大字 ---- */
+    .stat-num {
+      font-size: 2.2rem; font-weight: 900;
+      font-family: 'Space Mono', monospace;
+      line-height: 1;
+    }
+
+    /* ---- 決策樹節點 ---- */
+    .tree-node {
+      border-radius: 8px; padding: 7px 14px;
+      font-size: 0.78rem; font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      white-space: nowrap;
+    }
+    .tree-connector {
+      width: 2px; height: 18px; background: var(--border);
+      margin: 0 auto;
+    }
+
+    /* ---- 脈衝 badge ---- */
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .7; transform: scale(1.08); }
+    }
+    .badge-pulse { animation: pulse 2s ease-in-out infinite; }
+
+    /* ---- 訊息吐司 ---- */
+    #toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 12px 20px; border-radius: 10px;
+      font-size: 0.85rem; box-shadow: var(--card-shadow);
+      transform: translateY(80px); opacity: 0;
+      transition: all .3s cubic-bezier(.22,1,.36,1);
+      z-index: 9999; pointer-events: none; max-width: 320px;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ---- Scrollbar global ---- */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ---- Section card ---- */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
+      box-shadow: var(--card-shadow);
+    }
+
+    /* ---- Section label ---- */
+    .section-label {
+      font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 4px;
+    }
+
+    /* ---- Progress bar ---- */
+    .progress-bg { background: var(--surface2); border-radius: 999px; height: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 999px; transition: width 0.6s ease; }
+
+    /* ---- Decision Tree Visualization ---- */
+    .dt-container {
+      position: relative;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .dt-row { display: flex; gap: 16px; align-items: flex-start; justify-content: center; }
+    .dt-branch { display: flex; flex-direction: column; align-items: center; }
+    .dt-line-h { width: 60px; height: 2px; background: var(--border); margin-top: 10px; }
+
+    /* highlight active decision */
+    .dt-active-express  { border-color: var(--accent-express)  !important; background: rgba(0,229,160,0.12)  !important; color: var(--accent-express)  !important; }
+    .dt-active-priority { border-color: var(--accent-priority) !important; background: rgba(251,191,36,0.12) !important; color: var(--accent-priority) !important; }
+    .dt-active-standard { border-color: var(--accent-standard) !important; background: rgba(96,165,250,0.12) !important; color: var(--accent-standard) !important; }
+    .dt-active-root     { border-color: #a78bfa !important; background: rgba(167,139,250,0.1) !important; }
+  </style>
+</head>
+<body class="pb-20">
+
+<!-- ============================================================
+     頁首
+============================================================ -->
+<header class="max-w-7xl mx-auto px-5 pt-10 pb-4">
+  <div class="flex flex-col sm:flex-row sm:items-end gap-3 justify-between">
+    <div>
+      <div class="section-label">國立金門大學 · 學餐系統</div>
+      <h1 class="text-3xl sm:text-4xl font-black title-gradient leading-tight">
+        動態預約 &amp; 訂單優化系統
+      </h1>
+      <p class="text-sm text-slate-400 mt-2">Decision Tree × Multi-Queue Scheduling</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="badge-pulse inline-flex items-center gap-2 text-xs font-mono bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 px-3 py-1.5 rounded-full">
+        <span class="w-2 h-2 bg-emerald-400 rounded-full inline-block"></span>
+        SYSTEM LIVE
+      </span>
+      <!-- 即時時鐘 -->
+      <span id="clock" class="mono text-xs text-slate-500"></span>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     主體三欄版面
+============================================================ -->
+<main class="max-w-7xl mx-auto px-5 mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+  <!-- =========================================================
+       左側：點餐表單 (Decision Tree 分類)
+  ========================================================= -->
+  <section class="section-card lg:col-span-1 flex flex-col gap-6">
+
+    <!-- 標題 -->
+    <div>
+      <div class="section-label">區塊 01</div>
+      <h2 class="text-xl font-bold text-white">學生點餐 &amp; 訂單分類</h2>
+      <p class="text-xs text-slate-500 mt-1">決策樹 (Decision Tree) 自動分類至對應佇列</p>
+    </div>
+
+    <!-- ---- 表單 ---- -->
+    <div class="flex flex-col gap-4">
+
+      <!-- 學生姓名 (可選) -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium">學生暱稱 <span class="text-slate-600">(選填)</span></label>
+        <input type="text" id="inputName" placeholder="e.g. 小明、Alex..." />
+      </div>
+
+      <!-- 距離下一堂課 -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium">距離下一堂課時間 <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <select id="inputTime">
+            <option value="">-- 請選擇 --</option>
+            <option value="10">⚡ 10 分鐘內（超趕）</option>
+            <option value="25">🕐 25 分鐘內（有點趕）</option>
+            <option value="40">😌 40 分鐘以上（從容）</option>
+          </select>
+          <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+      </div>
+
+      <!-- 餐點類型 -->
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium">點購餐點類型 <span class="text-red-500">*</span></label>
+        <div class="relative">
+          <select id="inputMeal">
+            <option value="">-- 請選擇 --</option>
+            <option value="hot">🍱 熱門現做主食</option>
+            <option value="sandwich">🥪 三明治 / 即食輕食</option>
+            <option value="drink">🧋 單純飲品</option>
+          </select>
+          <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </div>
+      </div>
+
+      <!-- 按鈕列 -->
+      <div class="flex gap-3 mt-1">
+        <button class="btn btn-express flex-1" onclick="submitOrder()">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          送出訂單
+        </button>
+        <button class="btn btn-ghost" onclick="randomOrder()" title="隨機填入">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          隨機
+        </button>
+      </div>
+    </div>
+
+    <!-- ---- 決策樹可視化 ---- -->
+    <div>
+      <div class="section-label mb-3">決策樹路徑圖</div>
+      <div class="dt-container text-center gap-0" style="font-size:0.72rem;">
+
+        <!-- Root -->
+        <div id="dt-root" class="tree-node mx-auto" style="min-width:140px;">📦 新訂單進入</div>
+        <div class="tree-connector"></div>
+
+        <!-- Level 1: 時間判斷 -->
+        <div id="dt-time" class="tree-node mx-auto" style="min-width:160px;">⏱ 距離上課時間？</div>
+        <div class="tree-connector"></div>
+
+        <!-- Level 2: 三個分支 -->
+        <div class="flex gap-2 justify-center w-full">
+
+          <!-- Branch: 10分內 -->
+          <div class="dt-branch">
+            <div id="dt-b10" class="tree-node text-center" style="min-width:80px;">≤ 10 min</div>
+            <div class="tree-connector"></div>
+            <div id="dt-meal-b10" class="tree-node text-center" style="min-width:80px;">🥪 輕食/飲品?</div>
+            <div class="tree-connector"></div>
+            <div id="dt-express" class="tree-node text-center" style="min-width:80px; color:var(--accent-express); border-color:var(--accent-express);">
+              ⚡ Express
+            </div>
+          </div>
+
+          <!-- Branch: 25分內 -->
+          <div class="dt-branch">
+            <div id="dt-b25" class="tree-node text-center" style="min-width:80px;">≤ 25 min</div>
+            <div class="tree-connector"></div>
+            <div id="dt-priority" class="tree-node text-center" style="min-width:80px; color:var(--accent-priority); border-color:var(--accent-priority);">
+              🟡 Priority
+            </div>
+          </div>
+
+          <!-- Branch: 40分+ -->
+          <div class="dt-branch">
+            <div id="dt-b40" class="tree-node text-center" style="min-width:80px;">≥ 40 min</div>
+            <div class="tree-connector"></div>
+            <div id="dt-standard" class="tree-node text-center" style="min-width:80px; color:var(--accent-standard); border-color:var(--accent-standard);">
+              🔵 Standard
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- =========================================================
+       中右：佇列看板 + 統計
+  ========================================================= -->
+  <div class="lg:col-span-2 flex flex-col gap-6">
+
+    <!-- ---- 多重佇列看板 ---- -->
+    <section class="section-card">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <div class="section-label">區塊 02</div>
+          <h2 class="text-xl font-bold text-white">店家後台 — 多重製作佇列看板</h2>
+        </div>
+        <button class="btn btn-priority gap-2" onclick="processTick()">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          模擬時間流逝 / 廚房出餐
+        </button>
+      </div>
+
+      <!-- === Express Queue === -->
+      <div class="mb-5">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 badge-pulse"></span>
+          <span class="text-sm font-bold" style="color:var(--accent-express);">⚡ 快取車道 (Express Queue)</span>
+          <span id="badge-express" class="mono text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 px-2 py-0.5 rounded-full ml-auto">0 筆</span>
+        </div>
+        <div class="progress-bg mb-2">
+          <div id="prog-express" class="progress-fill" style="background:var(--accent-express); width:0%"></div>
+        </div>
+        <div class="neon-express rounded-xl p-3" style="background:rgba(0,229,160,0.04);">
+          <div id="queue-express" class="queue-track">
+            <span class="queue-empty">— 目前無訂單 —</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 mt-1.5 ml-1">出示條碼 → 直接取餐，無需等待製作</p>
+      </div>
+
+      <!-- === Priority Queue === -->
+      <div class="mb-5">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+          <span class="text-sm font-bold" style="color:var(--accent-priority);">🟡 綠色優先流水線 (Priority Queue)</span>
+          <span id="badge-priority" class="mono text-xs bg-amber-900/40 text-amber-400 border border-amber-700/50 px-2 py-0.5 rounded-full ml-auto">0 筆</span>
+        </div>
+        <div class="progress-bg mb-2">
+          <div id="prog-priority" class="progress-fill" style="background:var(--accent-priority); width:0%"></div>
+        </div>
+        <div class="neon-priority rounded-xl p-3" style="background:rgba(251,191,36,0.04);">
+          <div id="queue-priority" class="queue-track">
+            <span class="queue-empty">— 目前無訂單 —</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 mt-1.5 ml-1">插隊優先製作，每 tick 處理 2 筆訂單</p>
+      </div>
+
+      <!-- === Standard Queue === -->
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-400"></span>
+          <span class="text-sm font-bold" style="color:var(--accent-standard);">🔵 一般製作流水線 (Standard FIFO Queue)</span>
+          <span id="badge-standard" class="mono text-xs bg-blue-900/40 text-blue-400 border border-blue-700/50 px-2 py-0.5 rounded-full ml-auto">0 筆</span>
+        </div>
+        <div class="progress-bg mb-2">
+          <div id="prog-standard" class="progress-fill" style="background:var(--accent-standard); width:0%"></div>
+        </div>
+        <div class="neon-standard rounded-xl p-3" style="background:rgba(96,165,250,0.04);">
+          <div id="queue-standard" class="queue-track">
+            <span class="queue-empty">— 目前無訂單 —</span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-600 mt-1.5 ml-1">先來後到 FIFO，每 tick 處理 1 筆訂單</p>
+      </div>
+    </section>
+
+    <!-- ---- 統計看板 ---- -->
+    <section class="section-card">
+      <div class="section-label mb-1">區塊 03</div>
+      <h2 class="text-xl font-bold text-white mb-5">出餐統計看板</h2>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <!-- 總接單 -->
+        <div class="bg-surface2 rounded-xl p-4 border border-slate-800">
+          <div class="text-xs text-slate-500 mb-1">今日總接單</div>
+          <div class="stat-num text-white" id="stat-total">0</div>
+          <div class="text-xs text-slate-600 mt-1">訂單</div>
+        </div>
+        <!-- 已完成 -->
+        <div class="bg-surface2 rounded-xl p-4 border border-slate-800">
+          <div class="text-xs text-slate-500 mb-1">已完成出餐</div>
+          <div class="stat-num" id="stat-done" style="color:var(--accent-express);">0</div>
+          <div class="text-xs text-slate-600 mt-1">訂單</div>
+        </div>
+        <!-- 平均等待 -->
+        <div class="bg-surface2 rounded-xl p-4 border border-slate-800">
+          <div class="text-xs text-slate-500 mb-1">平均等待時間</div>
+          <div class="stat-num" id="stat-avg" style="color:var(--accent-priority);">0</div>
+          <div class="text-xs text-slate-600 mt-1">分鐘/筆</div>
+        </div>
+        <!-- 快取率 -->
+        <div class="bg-surface2 rounded-xl p-4 border border-slate-800">
+          <div class="text-xs text-slate-500 mb-1">快速取餐率</div>
+          <div class="stat-num" id="stat-rate" style="color:var(--accent-standard);">0%</div>
+          <div class="text-xs text-slate-600 mt-1">防遲到成功率</div>
+        </div>
+      </div>
+
+      <!-- 佇列分佈長條圖 -->
+      <div>
+        <div class="text-xs text-slate-500 mb-3 font-medium">各佇列訂單分佈 (今日累計)</div>
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-16" style="color:var(--accent-express);">EXPRESS</span>
+            <div class="flex-1 progress-bg">
+              <div id="bar-express" class="progress-fill" style="background:var(--accent-express); width:0%"></div>
+            </div>
+            <span id="bar-express-cnt" class="mono text-xs text-slate-500 w-8 text-right">0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-16" style="color:var(--accent-priority);">PRIORITY</span>
+            <div class="flex-1 progress-bg">
+              <div id="bar-priority" class="progress-fill" style="background:var(--accent-priority); width:0%"></div>
+            </div>
+            <span id="bar-priority-cnt" class="mono text-xs text-slate-500 w-8 text-right">0</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs mono w-16" style="color:var(--accent-standard);">STANDARD</span>
+            <div class="flex-1 progress-bg">
+              <div id="bar-standard" class="progress-fill" style="background:var(--accent-standard); width:0%"></div>
+            </div>
+            <span id="bar-standard-cnt" class="mono text-xs text-slate-500 w-8 text-right">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 最近完成訂單 log -->
+      <div class="mt-5">
+        <div class="text-xs text-slate-500 mb-2 font-medium">最近完成出餐記錄</div>
+        <div id="completed-log" class="font-mono text-xs text-slate-500 space-y-1 max-h-32 overflow-y-auto pr-1">
+          <div class="text-slate-700">等待訂單完成中…</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ============================================================
+     Toast 通知
+============================================================ -->
+<div id="toast"></div>
+
+<!-- ============================================================
+     JavaScript 核心邏輯
+============================================================ -->
+<script>
+// ================================================================
+// ██████  ██████  ████████  █████      ███████ ████████ ██████
+// ██   ██ ██   ██    ██    ██   ██     ██         ██    ██   ██
+// ██   ██ ██████     ██    ███████     ███████    ██    ██████
+// ██   ██ ██   ██    ██    ██   ██          ██    ██    ██   ██
+// ██████  ██   ██    ██    ██   ██     ███████    ██    ██   ██
+//
+// 金門大學學餐 動態預約與訂單優化系統
+// Concepts: Decision Tree + Multi-Queue (FIFO / Priority / Express)
+// ================================================================
+
+// ----------------------------------------------------------------
+// 1. 全域狀態
+// ----------------------------------------------------------------
+let orderCounter = 0;       // 自動遞增訂單編號
+let totalOrders   = 0;      // 今日總接單
+let doneOrders    = 0;      // 已完成出餐
+let totalWait     = 0;      // 累計等待時間（分鐘）
+
+// 各佇列累計接單數 (用於統計長條圖)
+const queueTotals = { express: 0, priority: 0, standard: 0 };
+
+// 完成的訂單日誌陣列
+const completedLog = [];
+
+/**
+ * 三條 Queue 使用 JavaScript 陣列模擬：
+ *
+ * Express  Queue: 超快，基本上等候 ≈ 0 分鐘
+ * Priority Queue: 優先製作，平均每筆 3 分鐘
+ * Standard Queue: 標準 FIFO，平均每筆 6 分鐘
+ *
+ * 每個元素為一個 order 物件：
+ * {
+ *   id: 'ORD-0001',
+ *   name: '小明',
+ *   mealType: 'hot' | 'sandwich' | 'drink',
+ *   timeClass: '10' | '25' | '40',
+ *   queueType: 'express' | 'priority' | 'standard',
+ *   estWait: number (分鐘),
+ *   enqueueAt: Date
+ * }
+ */
+const queues = {
+  express:  [],   // Express Queue  — Array 模擬 FIFO
+  priority: [],   // Priority Queue — Array 模擬 FIFO (但在分類時已給予最高插隊權)
+  standard: [],   // Standard Queue — Array 模擬嚴格 FIFO
+};
+
+// ----------------------------------------------------------------
+// 2. 決策樹 (Rule-based Decision Tree)
+// ----------------------------------------------------------------
+/**
+ * classifyOrder(timeClass, mealType)
+ *
+ * 這是本系統的核心「決策樹分類函式」。
+ * 使用 if-else 樹狀邏輯模擬決策樹節點：
+ *
+ *              [新訂單]
+ *                 │
+ *         ┌───────┴───────┐
+ *    ≤10分鐘           ≤25分鐘           ≥40分鐘
+ *         │                │                │
+ *  [輕食/飲品?]        [Priority]       [Standard]
+ *     Yes │ No
+ *  [Express] [Priority]  ← 若 10 分鐘內但點熱食，退而求其次進 Priority
+ *
+ * @param {string} timeClass - '10' | '25' | '40'
+ * @param {string} mealType  - 'hot' | 'sandwich' | 'drink'
+ * @returns {'express' | 'priority' | 'standard'}
+ */
+function classifyOrder(timeClass, mealType) {
+
+  // ── 節點 1：時間判斷（根節點） ──
+  if (timeClass === '10') {
+    // ── 節點 2：餐點類型判斷（左子樹） ──
+    if (mealType === 'sandwich' || mealType === 'drink') {
+      // 狀況 A：超趕 + 即食/飲品 → Express Queue
+      // 即食餐點已預先備好，學生秒取
+      return 'express';
+    } else {
+      // 狀況 A'：超趕但點熱食 → 雖然趕時間，熱食需要製作，
+      // 只能給予最高製作優先權 (Priority)，無法 Express
+      return 'priority';
+    }
+  }
+
+  // ── 節點 3：25分內判斷 ──
+  if (timeClass === '25') {
+    // 狀況 B：有點趕 → Priority Queue（優先製作）
+    // 無論餐點類型，一律插隊到優先流水線
+    return 'priority';
+  }
+
+  // ── 節點 4：40分以上（葉節點）──
+  // 狀況 C：從容 + 任何餐點 → Standard FIFO Queue
+  return 'standard';
+}
+
+// ----------------------------------------------------------------
+// 3. 預計等待時間計算
+// ----------------------------------------------------------------
+/**
+ * estimateWait(queueType)
+ * 根據佇列類型與目前隊伍長度，粗估等待分鐘數。
+ * Express: 每筆 0 分鐘（立即取餐）
+ * Priority: 每筆 3 分鐘
+ * Standard: 每筆 6 分鐘
+ */
+function estimateWait(queueType) {
+  const len = queues[queueType].length; // 目前隊伍長度（不含即將加入的這筆）
+  const rates = { express: 0, priority: 3, standard: 6 };
+  return len * rates[queueType];
+}
+
+// ----------------------------------------------------------------
+// 4. EnQueue 操作
+// ----------------------------------------------------------------
+/**
+ * enqueue(queueType, order)
+ * 將訂單推入指定 Queue 的尾端（陣列 push = enqueue）
+ * 同時更新 UI 上對應的佇列方塊
+ */
+function enqueue(queueType, order) {
+  queues[queueType].push(order);   // ← Array.push 模擬 Enqueue
+  queueTotals[queueType]++;
+  renderQueue(queueType);
+  updateStats();
+}
+
+// ----------------------------------------------------------------
+// 5. DeQueue 操作 (模擬時間流逝)
+// ----------------------------------------------------------------
+/**
+ * dequeue(queueType, count)
+ * 從指定 Queue 的前端移除 count 筆訂單（Array.shift 模擬 Dequeue）
+ * Express 每 tick 出 3 筆，Priority 出 2 筆，Standard 出 1 筆
+ */
+function dequeue(queueType, count) {
+  for (let i = 0; i < count; i++) {
+    if (queues[queueType].length === 0) break;
+
+    const order = queues[queueType].shift();  // ← Array.shift 模擬 Dequeue
+
+    // 紀錄完成時間
+    const elapsed = Math.round((Date.now() - order.enqueueAt) / 60000);
+    doneOrders++;
+    totalWait += order.estWait;
+
+    // 寫入完成日誌
+    const typeLabel = { express: '⚡ Express', priority: '🟡 Priority', standard: '🔵 Standard' };
+    completedLog.unshift(
+      `${now()} │ ${order.id} [${typeLabel[queueType]}] ${order.name || '匿名'} — 預估等 ${order.estWait} 分鐘`
+    );
+    if (completedLog.length > 20) completedLog.pop();
+  }
+  renderQueue(queueType);
+  updateStats();
+}
+
+// ----------------------------------------------------------------
+// 6. 渲染單條 Queue 的 UI
+// ----------------------------------------------------------------
+/**
+ * renderQueue(queueType)
+ * 根據 queues[queueType] 陣列的當前狀態，
+ * 重新渲染對應 DOM 容器內的訂單方塊。
+ */
+function renderQueue(queueType) {
+  const container = document.getElementById('queue-' + queueType);
+  container.innerHTML = '';
+
+  if (queues[queueType].length === 0) {
+    container.innerHTML = '<span class="queue-empty">— 目前無訂單 —</span>';
+    document.getElementById('badge-' + queueType).textContent = '0 筆';
+    document.getElementById('prog-' + queueType).style.width = '0%';
+    return;
+  }
+
+  // 最多顯示 12 筆；超過顯示 +N 提示
+  const MAX_SHOW = 12;
+  const toShow = queues[queueType].slice(0, MAX_SHOW);
+  const extra  = queues[queueType].length - MAX_SHOW;
+
+  // 餐點圖示 Map
+  const mealIcon = { hot: '🍱', sandwich: '🥪', drink: '🧋' };
+  const colorMap = { express: 'card-express', priority: 'card-priority', standard: 'card-standard' };
+  const textColor = { express: 'var(--accent-express)', priority: 'var(--accent-priority)', standard: 'var(--accent-standard)' };
+
+  toShow.forEach((order, idx) => {
+    const card = document.createElement('div');
+    card.className = `order-card ${colorMap[queueType]}`;
+    card.style.animationDelay = `${idx * 0.04}s`;
+    card.innerHTML = `
+      <div class="mono font-bold" style="color:${textColor[queueType]};font-size:0.7rem;">${order.id}</div>
+      <div>${mealIcon[order.mealType]} ${order.name || '匿名'}</div>
+      <div class="text-slate-500">⏳ ${order.estWait === 0 ? '立即取餐' : '~' + order.estWait + ' min'}</div>
+    `;
+    container.appendChild(card);
+  });
+
+  if (extra > 0) {
+    const more = document.createElement('div');
+    more.className = 'order-card flex items-center justify-center text-slate-500';
+    more.style.background = 'var(--surface2)';
+    more.style.border = '1px dashed var(--border)';
+    more.innerHTML = `<span>+${extra} 筆</span>`;
+    container.appendChild(more);
+  }
+
+  // 更新 badge 和進度條
+  document.getElementById('badge-' + queueType).textContent = queues[queueType].length + ' 筆';
+  const maxCap = 10;
+  const pct = Math.min(queues[queueType].length / maxCap * 100, 100);
+  document.getElementById('prog-' + queueType).style.width = pct + '%';
+}
+
+// ----------------------------------------------------------------
+// 7. 更新統計看板
+// ----------------------------------------------------------------
+function updateStats() {
+  document.getElementById('stat-total').textContent = totalOrders;
+  document.getElementById('stat-done').textContent  = doneOrders;
+
+  const avgWait = doneOrders > 0 ? (totalWait / doneOrders).toFixed(1) : 0;
+  document.getElementById('stat-avg').textContent = avgWait;
+
+  // 快速取餐率 = (Express 完成 + Priority 完成) / 總完成 × 100%
+  // 近似算法：用各佇列已完成 / 總接單
+  const expressTotal  = queueTotals.express;
+  const priorityTotal = queueTotals.priority;
+  const rate = totalOrders > 0
+    ? Math.round((expressTotal + priorityTotal) / totalOrders * 100)
+    : 0;
+  document.getElementById('stat-rate').textContent = rate + '%';
+
+  // 長條圖更新
+  const grand = totalOrders || 1;
+  ['express', 'priority', 'standard'].forEach(t => {
+    const pct = Math.round(queueTotals[t] / grand * 100);
+    document.getElementById('bar-' + t).style.width = pct + '%';
+    document.getElementById('bar-' + t + '-cnt').textContent = queueTotals[t];
+  });
+
+  // 完成日誌
+  const logEl = document.getElementById('completed-log');
+  if (completedLog.length === 0) return;
+  logEl.innerHTML = completedLog
+    .map(l => `<div class="text-slate-500">${l}</div>`)
+    .join('');
+}
+
+// ----------------------------------------------------------------
+// 8. 決策樹視覺高亮
+// ----------------------------------------------------------------
+/**
+ * highlightDecisionTree(timeClass, mealType, result)
+ * 在決策樹圖中高亮走過的節點
+ */
+function highlightDecisionTree(timeClass, mealType, result) {
+  // 清除所有高亮
+  const nodes = ['dt-root','dt-time','dt-b10','dt-b25','dt-b40',
+                  'dt-meal-b10','dt-express','dt-priority','dt-standard'];
+  nodes.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('dt-active-express','dt-active-priority','dt-active-standard','dt-active-root');
+  });
+
+  // 根節點與時間節點
+  document.getElementById('dt-root').classList.add('dt-active-root');
+  document.getElementById('dt-time').classList.add('dt-active-root');
+
+  const cls = result === 'express' ? 'dt-active-express'
+            : result === 'priority' ? 'dt-active-priority'
+            : 'dt-active-standard';
+
+  if (timeClass === '10') {
+    document.getElementById('dt-b10').classList.add(cls);
+    document.getElementById('dt-meal-b10').classList.add(cls);
+    document.getElementById('dt-express').classList.add(result === 'express' ? 'dt-active-express' : 'dt-active-priority');
+  } else if (timeClass === '25') {
+    document.getElementById('dt-b25').classList.add(cls);
+    document.getElementById('dt-priority').classList.add(cls);
+  } else {
+    document.getElementById('dt-b40').classList.add(cls);
+    document.getElementById('dt-standard').classList.add(cls);
+  }
+
+  // 3 秒後清除高亮
+  setTimeout(() => {
+    nodes.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('dt-active-express','dt-active-priority','dt-active-standard','dt-active-root');
+    });
+  }, 3000);
+}
+
+// ----------------------------------------------------------------
+// 9. 送出訂單（主入口）
+// ----------------------------------------------------------------
+/**
+ * submitOrder()
+ * 從表單讀取輸入 → 執行決策樹 → Enqueue 到對應佇列
+ */
+function submitOrder() {
+  const timeClass = document.getElementById('inputTime').value;
+  const mealType  = document.getElementById('inputMeal').value;
+  const name      = document.getElementById('inputName').value.trim() || '匿名同學';
+
+  // 基本驗證
+  if (!timeClass || !mealType) {
+    showToast('⚠️ 請填寫完整的訂單資訊！', 'warning');
+    return;
+  }
+
+  orderCounter++;
+  totalOrders++;
+
+  // ── 執行決策樹分類 ──
+  const queueType = classifyOrder(timeClass, mealType);
+
+  // 建立訂單物件
+  const order = {
+    id:        'ORD-' + String(orderCounter).padStart(4, '0'),
+    name:      name,
+    mealType:  mealType,
+    timeClass: timeClass,
+    queueType: queueType,
+    estWait:   estimateWait(queueType),
+    enqueueAt: Date.now(),
+  };
+
+  // ── 執行 Enqueue 操作 ──
+  enqueue(queueType, order);
+
+  // 高亮決策樹
+  highlightDecisionTree(timeClass, mealType, queueType);
+
+  // 顯示結果通知
+  const labels = {
+    express:  '⚡ 快取車道 (Express Queue)',
+    priority: '🟡 優先佇列 (Priority Queue)',
+    standard: '🔵 一般佇列 (Standard Queue)',
+  };
+  const colors = { express: '#00e5a0', priority: '#fbbf24', standard: '#60a5fa' };
+  showToast(`${order.id} 已分類至 ${labels[queueType]}`, 'success', colors[queueType]);
+
+  // 清空表單（保留隨機性）
+  document.getElementById('inputName').value = '';
+}
+
+// ----------------------------------------------------------------
+// 10. 隨機填入訂單
+// ----------------------------------------------------------------
+function randomOrder() {
+  const times  = ['10', '25', '40'];
+  const meals  = ['hot', 'sandwich', 'drink'];
+  const names  = ['小明', '阿宏', 'Emily', '阿志', 'Sara', '小婷', '大衛', '芸芸', 'Kevin', '小桃'];
+
+  document.getElementById('inputTime').value = times[Math.floor(Math.random() * times.length)];
+  document.getElementById('inputMeal').value = meals[Math.floor(Math.random() * meals.length)];
+  document.getElementById('inputName').value = names[Math.floor(Math.random() * names.length)];
+
+  showToast('🎲 已隨機生成訂單內容，按「送出訂單」確認！');
+}
+
+// ----------------------------------------------------------------
+// 11. 模擬時間流逝 / 廚房出餐
+// ----------------------------------------------------------------
+/**
+ * processTick()
+ * 每次點擊視為廚房完成一個「生產週期」：
+ *   Express  → 每 tick 出 3 筆（幾乎即時）
+ *   Priority → 每 tick 出 2 筆（優先快速）
+ *   Standard → 每 tick 出 1 筆（正常節奏）
+ */
+function processTick() {
+  const processed = { express: 0, priority: 0, standard: 0 };
+
+  const expressCount  = Math.min(3, queues.express.length);
+  const priorityCount = Math.min(2, queues.priority.length);
+  const standardCount = Math.min(1, queues.standard.length);
+
+  dequeue('express',  expressCount);
+  dequeue('priority', priorityCount);
+  dequeue('standard', standardCount);
+
+  processed.express  = expressCount;
+  processed.priority = priorityCount;
+  processed.standard = standardCount;
+
+  const total = expressCount + priorityCount + standardCount;
+
+  if (total === 0) {
+    showToast('📭 目前所有佇列皆為空，尚無訂單需要處理。');
+  } else {
+    showToast(`✅ 廚房出餐：Express ${expressCount} 筆、Priority ${priorityCount} 筆、Standard ${standardCount} 筆`);
+  }
+}
+
+// ----------------------------------------------------------------
+// 12. Toast 通知
+// ----------------------------------------------------------------
+let toastTimer;
+function showToast(msg, type = 'info', color = null) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  if (color) el.style.borderColor = color;
+  else el.style.borderColor = 'var(--border)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ----------------------------------------------------------------
+// 13. 時鐘
+// ----------------------------------------------------------------
+function now() {
+  return new Date().toLocaleTimeString('zh-TW', { hour12: false });
+}
+setInterval(() => {
+  document.getElementById('clock').textContent = now();
+}, 1000);
+document.getElementById('clock').textContent = now();
+
+// ----------------------------------------------------------------
+// 14. 預熱示範訂單 (頁面載入後自動加入 3 筆示範訂單)
+// ----------------------------------------------------------------
+(function seedOrders() {
+  const demos = [
+    { name: '小明', timeClass: '10', mealType: 'drink' },
+    { name: 'Emily', timeClass: '25', mealType: 'hot' },
+    { name: '阿宏', timeClass: '40', mealType: 'hot' },
+  ];
+  demos.forEach(d => {
+    orderCounter++;
+    totalOrders++;
+    const qt = classifyOrder(d.timeClass, d.mealType);
+    enqueue(qt, {
+      id: 'ORD-' + String(orderCounter).padStart(4, '0'),
+      name: d.name,
+      mealType: d.mealType,
+      timeClass: d.timeClass,
+      queueType: qt,
+      estWait: estimateWait(qt),
+      enqueueAt: Date.now(),
+    });
+  });
+})();
+
+</script>
+</body>
+</html>
