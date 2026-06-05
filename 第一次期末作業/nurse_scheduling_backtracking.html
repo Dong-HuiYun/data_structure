@@ -441,7 +441,7 @@ function checkC4(schedule,ni,day,shift){
   for(let d=weekStart;d<Math.min(weekStart+7,day+1);d++){
     if(schedule[ni][d]&&schedule[ni][d]!=='O') workDays++;
   }
-  if(workDays>5){
+  if(workDays+1>5){
     return {ok:false,constraint:'C4',msg:`C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>${5}天`};
   }
   return {ok:true};
