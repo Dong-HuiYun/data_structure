@@ -433,18 +433,19 @@ function checkC3(schedule,ni,day,shift,partial){
   return {ok:true};
 }
 
-function checkC4(schedule,ni,day,shift){
-  // Max 5 working days per 7-day window
-  if(shift==='O') return {ok:true};
-  const weekStart=Math.floor(day/7)*7;
-  let workDays=0;
-  for(let d=weekStart;d<Math.min(weekStart+7,day+1);d++){
-    if(schedule[ni][d]&&schedule[ni][d]!=='O') workDays++;
+function checkC4(schedule, ni, day, shift) {
+  if (shift === 'O') return {ok: true};
+  const weekStart = Math.floor(day / 7) * 7;
+  let workDays = 0;
+  // 只計算本週「今天之前」已排的上班天
+  for (let d = weekStart; d < day; d++) {
+    if (schedule[ni][d] && schedule[ni][d] !== 'O') workDays++;
   }
-  if(workDays+1>5){
-    return {ok:false,constraint:'C4',msg:`C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>${5}天`};
+  // 加上今天這一天（即將賦值的）
+  if (workDays + 1 > 5) {
+    return {ok: false, constraint: 'C4', msg: `C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>5天`};
   }
-  return {ok:true};
+  return {ok: true};
 }
 
 function checkC5(schedule,ni,day,shift){
