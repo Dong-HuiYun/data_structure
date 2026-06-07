@@ -139,15 +139,88 @@ tr:last-child td{border-bottom:none}
   </div>
 
   <div class="card" style="margin-bottom:12px">
+    <h3>⚙️ 約束參數設定</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">調整各約束的嚴格程度，數值越嚴格剪枝越多。預設值為較嚴格模式，方便觀察回溯效果。</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+
+      <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="badge b-red">C1</span>
+          <span style="font-weight:600;font-size:13px">最大連續大夜班天數</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="cfg-c1" min="1" max="5" value="2" style="flex:1" oninput="syncCfg()">
+          <span id="cfg-c1-v" style="width:32px;font-weight:600;color:var(--red)">2天</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">原始值：3天｜嚴格預設：2天</div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="badge b-blue">C3</span>
+          <span style="font-weight:600;font-size:13px">每班最低人數需求</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="cfg-c3-min" min="1" max="4" value="3" style="flex:1" oninput="syncCfg()">
+          <span id="cfg-c3-min-v" style="width:32px;font-weight:600;color:var(--blue)">3人</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">原始值：2人｜嚴格預設：3人</div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="badge b-blue">C3</span>
+          <span style="font-weight:600;font-size:13px">每班最低專科護理師數</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="cfg-c3-exp" min="1" max="3" value="2" style="flex:1" oninput="syncCfg()">
+          <span id="cfg-c3-exp-v" style="width:32px;font-weight:600;color:var(--blue)">2人</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">原始值：1人｜嚴格預設：2人</div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="badge b-purple">C4</span>
+          <span style="font-weight:600;font-size:13px">每週最多工作天數</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="cfg-c4" min="3" max="6" value="4" style="flex:1" oninput="syncCfg()">
+          <span id="cfg-c4-v" style="width:32px;font-weight:600;color:var(--purple)">4天</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">原始值：5天｜嚴格預設：4天</div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:8px;padding:12px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span class="badge b-teal">C5</span>
+          <span style="font-weight:600;font-size:13px">每人隨機請假天數</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="range" id="cfg-c5-leave" min="1" max="6" value="4" style="flex:1" oninput="syncCfg()">
+          <span id="cfg-c5-leave-v" style="width:32px;font-weight:600;color:var(--teal)">4天</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">原始值：2~3天｜嚴格預設：4天</div>
+      </div>
+
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bs" onclick="setPreset('strict')">🔴 嚴格模式</button>
+      <button class="btn bs" onclick="setPreset('normal')">🟡 一般模式</button>
+      <button class="btn bs" onclick="setPreset('loose')">🟢 寬鬆模式</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
     <h3>🔒 五層硬約束（Pruning 條件）</h3>
     <table>
       <thead><tr><th style="text-align:left">約束名稱</th><th style="text-align:left">規則說明</th><th>剪枝強度</th></tr></thead>
       <tbody>
-        <tr><td style="text-align:left"><span class="badge b-red">C1 連班限制</span></td><td style="text-align:left">不得連續大夜班超過 3 天</td><td>⭐⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-red">C1 連班限制</span></td><td style="text-align:left">不得連續大夜班超過 <span id="disp-c1">2</span> 天</td><td>⭐⭐⭐⭐⭐</td></tr>
         <tr><td style="text-align:left"><span class="badge b-amber">C2 輪替順序</span></td><td style="text-align:left">大夜班後隔天必須休假（N→O）</td><td>⭐⭐⭐⭐</td></tr>
-        <tr><td style="text-align:left"><span class="badge b-blue">C3 每班人數</span></td><td style="text-align:left">每班至少2人，其中至少1名專科護理師</td><td>⭐⭐⭐⭐⭐</td></tr>
-        <tr><td style="text-align:left"><span class="badge b-purple">C4 每週工時</span></td><td style="text-align:left">每週上班不得超過5天</td><td>⭐⭐⭐</td></tr>
-        <tr><td style="text-align:left"><span class="badge b-teal">C5 請假需求</span></td><td style="text-align:left">個人指定休假日必須排 O</td><td>⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-blue">C3 每班人數</span></td><td style="text-align:left">每班至少 <span id="disp-c3-min">3</span> 人，其中至少 <span id="disp-c3-exp">2</span> 名專科護理師</td><td>⭐⭐⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-purple">C4 每週工時</span></td><td style="text-align:left">每週上班不得超過 <span id="disp-c4">4</span> 天</td><td>⭐⭐⭐</td></tr>
+        <tr><td style="text-align:left"><span class="badge b-teal">C5 請假需求</span></td><td style="text-align:left">個人指定休假日必須排 O（隨機 <span id="disp-c5">4</span> 天）</td><td>⭐⭐⭐⭐</td></tr>
       </tbody>
     </table>
   </div>
@@ -336,6 +409,46 @@ const DAYS = 14;
 const SHIFTS = ['D','E','N','O']; // Day, Evening, Night, Off
 const SHIFT_NAME = {D:'白班',E:'小夜',N:'大夜',O:'休假'};
 
+// ─── CONSTRAINT CONFIG ────────────────────────────────────────────────
+let CFG = {c1MaxNight:2, c3MinStaff:3, c3MinExpert:2, c4MaxDays:4, c5LeaveDays:4};
+
+function syncCfg(){
+  CFG.c1MaxNight  = +document.getElementById('cfg-c1').value;
+  CFG.c3MinStaff  = +document.getElementById('cfg-c3-min').value;
+  CFG.c3MinExpert = +document.getElementById('cfg-c3-exp').value;
+  CFG.c4MaxDays   = +document.getElementById('cfg-c4').value;
+  CFG.c5LeaveDays = +document.getElementById('cfg-c5-leave').value;
+  document.getElementById('cfg-c1-v').textContent     = CFG.c1MaxNight  + '天';
+  document.getElementById('cfg-c3-min-v').textContent = CFG.c3MinStaff  + '人';
+  document.getElementById('cfg-c3-exp-v').textContent = CFG.c3MinExpert + '人';
+  document.getElementById('cfg-c4-v').textContent     = CFG.c4MaxDays   + '天';
+  document.getElementById('cfg-c5-leave-v').textContent = CFG.c5LeaveDays + '天';
+  document.getElementById('disp-c1').textContent      = CFG.c1MaxNight;
+  document.getElementById('disp-c3-min').textContent  = CFG.c3MinStaff;
+  document.getElementById('disp-c3-exp').textContent  = CFG.c3MinExpert;
+  document.getElementById('disp-c4').textContent      = CFG.c4MaxDays;
+  document.getElementById('disp-c5').textContent      = CFG.c5LeaveDays;
+}
+
+function setSlider(id, val){
+  document.getElementById(id).value = val;
+}
+
+function setPreset(mode){
+  const presets = {
+    strict: {c1:2, c3m:3, c3e:2, c4:4, c5:4},
+    normal: {c1:3, c3m:2, c3e:1, c4:5, c5:3},
+    loose:  {c1:4, c3m:2, c3e:1, c4:6, c5:2}
+  };
+  const p = presets[mode];
+  setSlider('cfg-c1', p.c1);
+  setSlider('cfg-c3-min', p.c3m);
+  setSlider('cfg-c3-exp', p.c3e);
+  setSlider('cfg-c4', p.c4);
+  setSlider('cfg-c5-leave', p.c5);
+  syncCfg();
+}
+
 let leaveMatrix = Array.from({length:NURSES.length},()=>new Array(DAYS).fill(false));
 let solveState = null;
 let statsChart = null, pruneChart = null, depthChart = null;
@@ -389,8 +502,7 @@ function toggleLeave(ni,d){
 function randomLeave(){
   leaveMatrix=Array.from({length:NURSES.length},()=>new Array(DAYS).fill(false));
   NURSES.forEach((_,ni)=>{
-    // Each nurse requests 2-3 days off
-    const nDays=2+Math.floor(Math.random()*2);
+    const nDays=CFG.c5LeaveDays;
     const days=new Set();
     while(days.size<nDays) days.add(Math.floor(Math.random()*DAYS));
     days.forEach(d=>leaveMatrix[ni][d]=true);
@@ -400,14 +512,13 @@ function randomLeave(){
 
 // ─── CONSTRAINT CHECKERS ─────────────────────────────────────────────
 function checkC1(schedule,ni,day,shift){
-  // No more than 3 consecutive night shifts
   if(shift!=='N') return {ok:true};
   let count=1;
-  for(let d=day-1;d>=0&&count<=3;d--){
+  for(let d=day-1;d>=0&&count<=CFG.c1MaxNight;d--){
     if(schedule[ni][d]==='N') count++;
     else break;
   }
-  if(count>3) return {ok:false,constraint:'C1',msg:`C1剪枝: ${NURSES[ni].name} 第${day+1}天連續大夜>${3}天`};
+  if(count>CFG.c1MaxNight) return {ok:false,constraint:'C1',msg:`C1剪枝: ${NURSES[ni].name} 第${day+1}天連續大夜>${CFG.c1MaxNight}天`};
   return {ok:true};
 }
 
@@ -419,33 +530,34 @@ function checkC2(schedule,ni,day,shift){
   return {ok:true};
 }
 
-function checkC3(schedule,ni,day,shift,partial){
-  // Each shift needs ≥2 nurses total, ≥1 expert
-  if(shift==='O') return {ok:true};
-  const shiftWorkers=[];
-  for(let n2=0;n2<NURSES.length;n2++){
-    if(partial[n2]!==undefined&&partial[n2][day]!==undefined&&partial[n2][day]===shift){
-      shiftWorkers.push(n2);
+function checkC3(schedule,ni,day,shift){
+  const allAssigned=NURSES.every((_,n2)=>schedule[n2][day]!==null);
+  if(!allAssigned) return {ok:true};
+  for(const s of ['D','E','N']){
+    const workers=NURSES.filter((_,n2)=>schedule[n2][day]===s);
+    if(workers.length===0) continue;
+    if(workers.length<CFG.c3MinStaff){
+      return {ok:false,constraint:'C3',msg:`C3剪枝: 第${day+1}天${s}班人數不足${CFG.c3MinStaff}人`};
+    }
+    const expertCount=workers.filter(w=>w.expert).length;
+    if(expertCount<CFG.c3MinExpert){
+      return {ok:false,constraint:'C3',msg:`C3剪枝: 第${day+1}天${s}班專科護理師不足${CFG.c3MinExpert}人`};
     }
   }
-  // Forward check: if shift already has 2+ people, adding more is fine
-  // If we're the first, check if enough nurses remain to staff it
   return {ok:true};
 }
 
-function checkC4(schedule, ni, day, shift) {
-  if (shift === 'O') return {ok: true};
-  const weekStart = Math.floor(day / 7) * 7;
-  let workDays = 0;
-  // 只計算本週「今天之前」已排的上班天
-  for (let d = weekStart; d < day; d++) {
-    if (schedule[ni][d] && schedule[ni][d] !== 'O') workDays++;
+function checkC4(schedule,ni,day,shift){
+  if(shift==='O') return {ok:true};
+  const weekStart=Math.floor(day/7)*7;
+  let workDays=0;
+  for(let d=weekStart;d<day;d++){
+    if(schedule[ni][d]&&schedule[ni][d]!=='O') workDays++;
   }
-  // 加上今天這一天（即將賦值的）
-  if (workDays + 1 > 5) {
-    return {ok: false, constraint: 'C4', msg: `C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>5天`};
+  if(workDays+1>CFG.c4MaxDays){
+    return {ok:false,constraint:'C4',msg:`C4剪枝: ${NURSES[ni].name} 第${Math.floor(day/7)+1}週工作>${CFG.c4MaxDays}天`};
   }
-  return {ok: true};
+  return {ok:true};
 }
 
 function checkC5(schedule,ni,day,shift){
@@ -457,7 +569,7 @@ function checkC5(schedule,ni,day,shift){
 }
 
 function checkAllConstraints(schedule,ni,day,shift){
-  const checks=[checkC1,checkC2,checkC4,checkC5];
+  const checks=[checkC1,checkC2,checkC3,checkC4,checkC5];
   for(const fn of checks){
     const r=fn(schedule,ni,day,shift);
     if(!r.ok) return r;
@@ -501,28 +613,31 @@ function buildOrder(){
 
 function solveStep(state){
   if(state.done) return;
-  // Iterative DFS with explicit stack
   if(state.stack.length===0){
-    // Initialize: start with first variable
-    state.stack.push({pos:0,shiftsLeft:[...SHIFTS]});
+    const [ni0,d0]=state.order[0];
+    const s0=(ni0+d0)%SHIFTS.length;
+    state.stack.push({pos:0,shiftsLeft:[...SHIFTS.slice(s0),...SHIFTS.slice(0,s0)]});
   }
   const frame=state.stack[state.stack.length-1];
   if(frame.pos>=state.order.length){
-    // All assigned - success!
     state.done=true;state.found=true;
     state.steps.push({type:'found',msg:'✅ 找到合法排班！所有約束均滿足。',tried:state.tried,bt:state.backtracks,pruned:state.pruned});
     return;
   }
   const [ni,d]=state.order[frame.pos];
-  // If already assigned (leave day)
   if(state.schedule[ni][d]!==null){
-    state.stack.push({pos:frame.pos+1,shiftsLeft:[...SHIFTS]});
+    const nextPos=frame.pos+1;
+    if(nextPos<state.order.length){
+      const [nni,nd]=state.order[nextPos];
+      const si=(nni+nd)%SHIFTS.length;
+      state.stack.push({pos:nextPos,shiftsLeft:[...SHIFTS.slice(si),...SHIFTS.slice(0,si)]});
+    } else {
+      state.stack.push({pos:nextPos,shiftsLeft:[...SHIFTS]});
+    }
     state.tried++;
     return;
   }
-  // Try next shift
   if(frame.shiftsLeft.length===0){
-    // Backtrack
     state.schedule[ni][d]=null;
     state.stack.pop();
     state.backtracks++;
@@ -542,14 +657,19 @@ function solveStep(state){
     if(check.constraint) state.pruneCounts[check.constraint]=(state.pruneCounts[check.constraint]||0)+1;
     state.depthHistory.push({depth:frame.pos,type:'prune',constraint:check.constraint});
     state.steps.push({type:'prune',constraint:check.constraint,msg:`✂ ${check.msg}`,tried:state.tried,bt:state.backtracks,pruned:state.pruned});
-    return; // Stay at same position, try next shift
+    return;
   }
-  // Assign
   state.schedule[ni][d]=shift;
   state.depthHistory.push({depth:frame.pos,type:'assign'});
-  const shortName=NURSES[ni].name.slice(0,1)+'護';
   state.steps.push({type:'assign',msg:`📌 賦值: ${NURSES[ni].name} 第${d+1}天 → ${shift}(${SHIFT_NAME[shift]})`,tried:state.tried,bt:state.backtracks,pruned:state.pruned});
-  state.stack.push({pos:frame.pos+1,shiftsLeft:[...SHIFTS]});
+  const nextPos=frame.pos+1;
+  if(nextPos<state.order.length){
+    const [nni,nd]=state.order[nextPos];
+    const si=(nni+nd)%SHIFTS.length;
+    state.stack.push({pos:nextPos,shiftsLeft:[...SHIFTS.slice(si),...SHIFTS.slice(0,si)]});
+  } else {
+    state.stack.push({pos:nextPos,shiftsLeft:[...SHIFTS]});
+  }
 }
 
 let stepIdx=0;
@@ -707,26 +827,44 @@ function drawAnalysis(){
 
   document.getElementById('a-brute').textContent='∞ (天文數字)';
   document.getElementById('a-actual').textContent=solveState.tried.toLocaleString();
-  const topIdx=data.indexOf(Math.max(...data));
-  document.getElementById('a-eff').textContent=labels[topIdx];
+  const totalPrune=data.reduce((a,b)=>a+b,0);
+  document.getElementById('a-eff').textContent=totalPrune===0?'剪枝極少（解很快找到）':labels[data.indexOf(Math.max(...data))];
 
   if(pruneChart) pruneChart.destroy();
-  pruneChart=new Chart(document.getElementById('prune-canvas'),{
-    type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:['#FCEBEB','#FDF3E4','#EEEDFE','#F1EFE8','#E1F5EE'],borderColor:colors,borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
-  });
+  const pruneCanvas=document.getElementById('prune-canvas');
+  if(totalPrune===0){
+    // Show message instead of empty chart
+    pruneCanvas.style.display='none';
+    let msg=document.getElementById('prune-empty-msg');
+    if(!msg){
+      msg=document.createElement('div');
+      msg.id='prune-empty-msg';
+      msg.style.cssText='text-align:center;padding:60px 20px;color:var(--muted);font-size:13px;line-height:1.8';
+      pruneCanvas.parentNode.appendChild(msg);
+    }
+    msg.style.display='block';
+    msg.innerHTML='🎉 <strong>剪枝次數為零</strong><br>演算法非常順利地找到合法排班，<br>未觸發任何約束剪枝。';
+  } else {
+    pruneCanvas.style.display='block';
+    const emptyMsg=document.getElementById('prune-empty-msg');
+    if(emptyMsg) emptyMsg.style.display='none';
+    pruneChart=new Chart(pruneCanvas,{
+      type:'doughnut',
+      data:{labels,datasets:[{data,backgroundColor:['#FCEBEB','#FDF3E4','#EEEDFE','#F1EFE8','#E1F5EE'],borderColor:colors,borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+    });
+  }
 
-  // Depth chart
+  // Depth chart - per constraint breakdown
   const binSize=10;
   const maxDepth=NURSES.length*DAYS;
   const bins=Math.ceil(maxDepth/binSize);
   const assignBins=new Array(bins).fill(0);
-  const pruneBins=new Array(bins).fill(0);
-  solveState.depthHistory.forEach(({depth,type})=>{
+  const cBins={C1:new Array(bins).fill(0),C2:new Array(bins).fill(0),C3:new Array(bins).fill(0),C4:new Array(bins).fill(0),C5:new Array(bins).fill(0)};
+  solveState.depthHistory.forEach(({depth,type,constraint})=>{
     const bin=Math.min(Math.floor(depth/binSize),bins-1);
     if(type==='assign') assignBins[bin]++;
-    else pruneBins[bin]++;
+    else if(constraint&&cBins[constraint]) cBins[constraint][bin]++;
   });
 
   if(depthChart) depthChart.destroy();
@@ -736,12 +874,16 @@ function drawAnalysis(){
       labels:Array.from({length:bins},(_,i)=>`${i*binSize}`),
       datasets:[
         {label:'賦值',data:assignBins,backgroundColor:'rgba(24,95,165,0.5)',borderRadius:2},
-        {label:'剪枝',data:pruneBins,backgroundColor:'rgba(162,45,45,0.5)',borderRadius:2}
+        {label:'C1 連班',data:cBins.C1,backgroundColor:'rgba(163,45,45,0.6)',borderRadius:2},
+        {label:'C2 輪替',data:cBins.C2,backgroundColor:'rgba(133,79,11,0.6)',borderRadius:2},
+        {label:'C3 人數',data:cBins.C3,backgroundColor:'rgba(83,74,183,0.6)',borderRadius:2},
+        {label:'C4 工時',data:cBins.C4,backgroundColor:'rgba(95,94,90,0.6)',borderRadius:2},
+        {label:'C5 請假',data:cBins.C5,backgroundColor:'rgba(15,110,86,0.6)',borderRadius:2}
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},
-      scales:{x:{title:{display:true,text:'搜索深度（賦值位置）',font:{size:11}},ticks:{maxTicksLimit:8,font:{size:10}}},
-              y:{ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}}}
+      scales:{x:{stacked:true,title:{display:true,text:'搜索深度（賦值位置）',font:{size:11}},ticks:{maxTicksLimit:8,font:{size:10}}},
+              y:{stacked:true,ticks:{font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}}}}
   });
 
   // Constraint bars
@@ -753,16 +895,18 @@ function drawAnalysis(){
     {label:'C4 每週工時',count:pc.C4||0,color:'var(--gray)'},
     {label:'C5 請假需求',count:pc.C5||0,color:'var(--teal)'}
   ];
-  document.getElementById('cbar-wrap').innerHTML=cbarData.map(c=>`
+  const zeroNote=totalPrune===0?'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;padding:8px 12px;background:var(--teal-l);border-radius:6px;border:1px solid #a0ddd0">✅ 本次排班未觸發任何剪枝，演算法一次找到合法解。進度條全滿表示相對強度均等（皆為 0）。</div>':''
+  document.getElementById('cbar-wrap').innerHTML=zeroNote+cbarData.map(c=>`
     <div class="cbar">
       <div class="cbar-label">${c.label}</div>
-      <div class="cbar-track"><div class="cbar-fill" style="width:${Math.round(c.count/maxPrune*100)}%;background:${c.color}"></div></div>
+      <div class="cbar-track"><div class="cbar-fill" style="width:${totalPrune===0?100:Math.round(c.count/maxPrune*100)}%;background:${totalPrune===0?'var(--border)':c.color}"></div></div>
       <div style="width:50px;text-align:right;font-size:12px;color:var(--muted)">${c.count} 次</div>
     </div>
   `).join('');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────
+syncCfg();
 renderNurseGrid();
 randomLeave();
 document.getElementById('cfg-space').textContent='4^'+(NURSES.length*DAYS);

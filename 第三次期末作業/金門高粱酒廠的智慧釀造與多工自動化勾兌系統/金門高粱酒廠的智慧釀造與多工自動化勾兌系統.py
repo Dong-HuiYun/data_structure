@@ -341,13 +341,17 @@ class KKLSizingApp:
                     outline_color = "#5C2E0B"
                     outline_w = 1
                 
-                radius_x, radius_y = (22, 16) if depth < 5 else (18, 13)
-                self.canvas.create_oval(x-radius_x, y-radius_y, x+radius_x, y+radius_y+4, fill=color, outline=outline_color, width=outline_w)
-                self.canvas.create_rectangle(x-(radius_x//2), y-radius_y-5, x+(radius_x//2), y-radius_y, fill="#FFD700", outline="#5C2E0B")
-                
-                font_sz = 9 if depth < 5 else 7
-                self.canvas.create_text(x, y-2, text=barrel.name[:4], fill="white", font=("Helvetica", font_sz, "bold"))
-                self.canvas.create_text(x, y+9, text=f"ID:{barrel.id}|{barrel.priority}", fill="#FFFFE0", font=("Helvetica", font_sz-1))
+                radius_x, radius_y = (28, 20) if depth < 5 else (24, 17)
+                self.canvas.create_oval(x-radius_x, y-radius_y, x+radius_x, y+radius_y+4,
+                                        fill=color, outline=outline_color, width=outline_w)
+                self.canvas.create_rectangle(x-(radius_x//2), y-radius_y-6, x+(radius_x//2), y-radius_y,
+                                              fill="#FFD700", outline="#5C2E0B")
+
+                font_sz = 10 if depth < 5 else 9
+                self.canvas.create_text(x, y-4,  text=barrel.name[:4],
+                                        fill="#FFFFFF", font=("Helvetica", font_sz, "bold"))
+                self.canvas.create_text(x, y+10, text=f"#{barrel.id} {barrel.priority}分",
+                                        fill="#FFE87C", font=("Helvetica", font_sz, "bold"))
                 
                 if i == 0:
                     self.canvas.create_text(x, y-32, text="★ 首選勾兌原酒", fill="#FF4500", font=("Helvetica", 9, "bold"))
